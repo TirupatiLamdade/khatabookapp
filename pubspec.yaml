@@ -1,0 +1,90 @@
+# name: login_setup
+# description: "A new Flutter project."
+# publish_to: 'none'
+
+# version: 1.0.0+1
+
+# environment:
+#   sdk: ^3.12.1
+
+# dependencies:
+#   flutter:
+#     sdk: flutter
+
+#   cupertino_icons: ^1.0.8
+#   firebase_core: ^4.11.0
+#   firebase_auth: ^6.5.4
+#   google_sign_in: ^6.3.0
+#   flutter_facebook_auth: ^7.0.0
+#   cloud_firestore: ^6.6.0
+  
+  
+#   # लेटेस्ट फॉन्ट ऑसम जो कोणत्याही एररशिवाय सर्व सोशल आयकॉन्स देईल
+#   font_awesome_flutter: ^11.0.0
+#   sign_in_button: ^5.0.0
+
+# dev_dependencies:
+#   flutter_test:
+#     sdk: flutter
+#   flutter_lints: ^6.0.0
+
+# flutter:
+#   uses-material-design: true
+name: login_setup
+description: "Khatabook Smart - Production Grade Enterprise Ledger Platform"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 🪙 State Management
+  flutter_riverpod: ^2.5.1
+  url_launcher: ^6.3.1
+
+  # 🧭 Routing & Navigation
+  go_router: ^14.2.0
+
+  # 🔥 Firebase Suite (Original Configurations)
+  firebase_core: ^3.1.0
+  firebase_auth: ^5.1.0
+  cloud_firestore: ^5.6.12
+  firebase_storage: ^12.0.1
+  firebase_messaging: ^15.2.10
+
+  # 📦 Local Cache & Encryption Storage (Offline First)
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.3
+
+  # 🛡️ Hardware & Biometrics Authentication
+  local_auth: ^2.2.0
+
+  # 🌐 Network & Device Utilities
+  connectivity_plus: ^6.0.3
+  intl: ^0.19.0
+  share_plus: ^12.0.2
+  image_picker: ^1.1.2
+
+  # 📊 Export Engines (PDF, Excel, CSV)
+  pdf: ^3.10.8
+  excel: ^4.0.6     # 👈 इथे व्हर्जन बदलून 4.0.6 केली आहे
+  flutter_local_notifications: ^22.0.1
+  universal_html: ^2.3.0
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  # 🖼️ Assets (If using custom images/icons or Lottie animations)
+  # assets:
+  #   - assets/images/
