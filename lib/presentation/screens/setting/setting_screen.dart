@@ -2,103 +2,71 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/global_provider_hub.dart';
-import 'developer_settings_view.dart';
 
 class SettingScreen extends ConsumerWidget {
   const SettingScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeShopId = ref.watch(activeShopIdProvider) ?? "निवडलेले नाही";
-    final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 900;
+    final activeShopId = ref.watch(activeShopIdProvider) ?? "No Shop Active";
+    final currentThemeMode = ref.watch(themeModeProvider);
+    final isDesktop = MediaQuery.of(context).size.width > 900;
 
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: Container(
-            // 🖥️ डेस्कटॉपवर लुक प्रोफेशनल ठेवण्यासाठी विड्थ पॅक केली आहे
-            constraints: BoxConstraints(
-              maxWidth: isDesktop ? 700 : double.infinity,
-            ),
-            padding: const EdgeInsets.all(16.0),
+            constraints: BoxConstraints(maxWidth: isDesktop ? 650 : double.infinity),
+            padding: const EdgeInsets.all(24.0),
             child: ListView(
               children: [
                 const Text(
-                  'ॲप सेटिंग्ज (Settings)',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  'Application Settings',
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // 🏪 सध्याचे दुकान कार्ड
+                // Active Tenant Display Card
                 Card(
-                  elevation: 2,
+                  elevation: 0,
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.deepPurple.shade50,
-                      child: Icon(Icons.storefront, color: Colors.deepPurple.shade800),
-                    ),
-                    title: const Text('सक्रिय दुकान आयडी', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    subtitle: Text(activeShopId, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-                    trailing: TextButton(
-                      onPressed: () {
-                        // मुख्य डॅशबोर्डवरील शॉप इंडेक्स (१) वर न्यावे
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('दुकान बदलण्यासाठी मुख्य मेनूमधील "माझी दुकाने" वर जा.')),
-                        );
-                      },
-                      child: const Text('बदला'),
-                    ),
+                    leading: const Icon(Icons.storefront, color: Color(0xFF1E3A8A)),
+                    title: const Text('Active Store Context Identifier', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    subtitle: Text(activeShopId, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
-                // 🛠️ जनरल सेटिंग्स ग्रुप
-                const Text('सामान्य पर्याय', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                const Text('Interface Customization', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
                 const Divider(),
-                
-                ListTile(
-                  leading: const Icon(Icons.notifications_none),
-                  title: const Text('पुश नोटिफिकेशन (FCM)'),
-                  subtitle: const Text('व्यवहारांचे मेसेज आणि अलर्ट कॉन्फिगर करा'),
-                  trailing: Switch(value: true, onChanged: (val) {}),
-                ),
-                
-                ListTile(
-                  leading: const Icon(Icons.language),
-                  title: const Text('ॲपची भाषा (Language)'),
-                  subtitle: const Text('मराठी / English / हिंदी'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                  onTap: () {},
-                ),
+                const SizedBox(height: 8),
 
-                const SizedBox(height: 24),
-
-                // 👨‍💻 डेव्हलपर पर्याय ग्रुप
-                const Text('प्रगत पर्याय (Advanced)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                const Divider(),
-
+                // 🌓 Dynamic Theme Selector Action Row
                 ListTile(
-                  leading: const Icon(Icons.developer_mode, color: Colors.blue),
-                  title: const Text('डेव्हलपर सेटिंग्स (Developer Options)'),
-                  subtitle: const Text('लोकल डेटाबेस कॅश आणि लॉग्स तपासण्यासाठी'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-                  onTap: () {
-                    // डेव्हलपर व्ह्यू स्क्रीन उघडा
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const DeveloperSettingsView()),
-                    );
-                  },
+                  leading: const Icon(Icons.palette_outlined),
+                  title: const Text('Appearance Mode'),
+                  subtitle: Text(_getThemeModeName(currentThemeMode)),
+                  trailing: DropdownButton<ThemeMode>(
+                    value: currentThemeMode,
+                    underline: const SizedBox(),
+                    onChanged: (ThemeMode? newMode) {
+                      if (newMode != null) {
+                        ref.read(themeModeProvider.notifier).state = newMode;
+                      }
+                    },
+                    items: const [
+                      DropdownMenuItem(value: ThemeMode.light, child: Text('Light Mode')),
+                      DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark Mode')),
+                      DropdownMenuItem(value: ThemeMode.system, child: Text('System Default')),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 32),
-
-                // 🚪 लॉगआउट बटन
                 ElevatedButton.icon(
                   onPressed: () {
-                    // ग्लोबल शॉप आयडी साफ करा आणि लॉगिन स्क्रीनवर परत जा
                     ref.read(activeShopIdProvider.notifier).state = null;
                     context.go('/login');
                   },
@@ -107,13 +75,10 @@ class SettingScreen extends ConsumerWidget {
                     foregroundColor: Colors.red.shade700,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.red.shade200),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  icon: const Icon(Icons.logout),
-                  label: const Text('ॲपमधून लॉगआउट करा', style: TextStyle(fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.logout_outlined),
+                  label: const Text('Log Out Safely', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -121,5 +86,16 @@ class SettingScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _getThemeModeName(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return "Light Theme Active";
+      case ThemeMode.dark:
+        return "Dark Theme Active";
+      case ThemeMode.system:
+        return "Following Device Preferences";
+    }
   }
 }
