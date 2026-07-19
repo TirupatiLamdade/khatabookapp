@@ -76,6 +76,7 @@ dependencies:
   excel: ^4.0.6     # 👈 इथे व्हर्जन बदलून 4.0.6 केली आहे
   flutter_local_notifications: ^22.0.1
   universal_html: ^2.3.0
+  google_sign_in: ^7.2.0
   
 dev_dependencies:
   flutter_test:
