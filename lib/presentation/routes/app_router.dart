@@ -29,7 +29,7 @@ class AppRouter {
         path: '/shop-setup',
         builder: (context, state) {
           final extra = state.extra as Map<String, String>? ?? {};
-          return ShopSetupScreen(
+          return ShopManageScreen(
             prefilledEmail: extra['email'] ?? '',
             prefilledPhone: extra['phone'] ?? '',
           );

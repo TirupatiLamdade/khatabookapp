@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:login_setup/presentation/screens/shop/shop_setup_screen.dart' show ShopManageScreen;
 import '../../../core/providers/global_provider_hub.dart';
 import '../customer/customer_list_screen.dart';
-import '../shop/shop_manage_screen.dart';
+
 import '../../widgets/responsive_drawer.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -18,7 +19,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // 💡 फिक्स: आता क्लीन कन्स्ट्रक्टर कॉल झाल्यामुळे इथे कोणतीही पॅरामीटर एरर येणार नाही
   final List<Widget> _screens = [
     const CustomerListScreen(),  
-    const ShopManageScreen(),    
+    const ShopManageScreen(prefilledEmail: '', prefilledPhone: '',),    
     const Center(child: Text('⚙️ सेटिंग्स स्क्रीन', style: TextStyle(fontSize: 18))),
   ];
 

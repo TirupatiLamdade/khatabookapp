@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -15,7 +14,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   
-  // Input Form Data Controllers
+  // Data Controllers
   final _identityController = TextEditingController(); 
   final _passwordController = TextEditingController();
   final _fullNameController = TextEditingController();
@@ -25,10 +24,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   final _otpController = TextEditingController();
 
   bool _isSignUpMode = false;
-  bool _isLoading = false;
-  bool _isEmailVerifiedSuccessfully = false;
+  bool _isPhoneAuthMode = false; 
+  bool _obscurePassword = true; 
+  
+  // Isolated loading variables to ensure mutual exclusion across operations
+  bool _isFormLoading = false;
+  bool _isGoogleLoading = false;
+  bool _isOtpLoading = false;
+  
   bool _showOtpVerificationField = false;
   String? _firebaseVerificationId;
+  ConfirmationResult? _webConfirmationResult;
   
   late AnimationController _ambientController;
 
@@ -54,35 +60,48 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
-  // Top-Anchored Global Toast Alert Notifications
+  // Global Overlay UI Layer Top Notification Engine
   void _showTopNotification(BuildContext context, String message, {bool isError = false}) {
     final overlay = Overlay.of(context);
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        top: 40,
+        top: 30,
         left: 24,
         right: 24,
         child: Material(
           color: Colors.transparent,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: BoxDecoration(
-              color: isError ? const Color(0xFFFEE2E2) : const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isError ? Colors.red.shade200 : Colors.green.shade200, width: 1.0),
+              // Highly professional, solid status indicators explicitly customized by parameter verification rules
+              color: isError ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+              borderRadius: BorderRadius.circular(8),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3), 
+                  blurRadius: 12, 
+                  offset: const Offset(0, 4),
+                )
               ],
             ),
             child: Row(
               children: [
-                Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: isError ? Colors.red : Colors.green),
-                const SizedBox(width: 12),
+                Icon(
+                  isError ? Icons.report_problem_rounded : Icons.check_circle_rounded, 
+                  color: Colors.white,
+                  size: 22,
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    message,
-                    style: TextStyle(color: isError ? Colors.red.shade900 : Colors.green.shade900, fontWeight: FontWeight.w600),
+                    message, 
+                    style: const TextStyle(
+                      color: Colors.white, 
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      letterSpacing: 0.2,
+                    ),
                   ),
                 ),
               ],
@@ -95,54 +114,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     Future.delayed(const Duration(seconds: 4), () => overlayEntry.remove());
   }
 
-  // 📧 SIGN-UP EMAIL VERIFICATION LINK FLOW
-  Future<void> _triggerEmailVerification() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      _showTopNotification(context, 'Please enter a valid email address first.', isError: true);
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      final existingDoc = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: email.toLowerCase()).get();
-      if (existingDoc.docs.isNotEmpty) {
-        _showTopNotification(context, 'This email is already registered. Please log in.', isError: true);
-        return;
-      }
-
-      // Dynamically extracts the project ID 'loginsetup-6f413' straight from runtime settings 
-      final projectId = Firebase.app().options.projectId;
-
-      await FirebaseAuth.instance.sendSignInLinkToEmail(
-        email: email,
-        actionCodeSettings: ActionCodeSettings(
-          url: 'https://$projectId.firebaseapp.com/__/auth/action',
-          handleCodeInApp: true,
-          androidPackageName: 'com.example.login_setup', // 💡 FIXED: Matches your exact Android configuration mapping!
-          androidInstallApp: true,
-          androidMinimumVersion: '12',
-        ),
-      );
-      
-      setState(() => _isEmailVerifiedSuccessfully = true); 
-      _showTopNotification(context, 'Verification link dispatched! The remaining registration parameters are now unlocked.');
-    } catch (e) {
-      _showTopNotification(context, 'Error processing token mapping: ${e.toString()}', isError: true);
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  // 🔐 MANDATORY AND SECURE SIGN-UP ROUTINE
+  // ✅ 1. STANDARD FIREBASE SIGN-UP ROUTINE
   Future<void> _executeSecureSignUp() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_isEmailVerifiedSuccessfully) {
-      _showTopNotification(context, 'You must verify your tracking email before completing profile creation.', isError: true);
-      return;
-    }
 
-    setState(() => _isLoading = true);
+    setState(() => _isFormLoading = true);
     final db = FirebaseFirestore.instance;
 
     try {
@@ -150,11 +126,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final checkPhone = await db.collection('users').where('phone', isEqualTo: _phoneController.text.trim()).get();
 
       if (checkUsername.docs.isNotEmpty) {
-        _showTopNotification(context, 'This username handle is already claimed by another user context.', isError: true);
+        _showTopNotification(context, 'Registration Aborted: Target username is already allocated within another workspace profile configuration setup.', isError: true);
+        setState(() => _isFormLoading = false);
         return;
       }
       if (checkPhone.docs.isNotEmpty) {
-        _showTopNotification(context, 'This active phone number asset is already linked to a workspace user.', isError: true);
+        _showTopNotification(context, 'Registration Aborted: Selected primary mobile signature string is already mapped to an existing active profile node.', isError: true);
+        setState(() => _isFormLoading = false);
         return;
       }
 
@@ -162,6 +140,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         email: _emailController.text.trim().toLowerCase(),
         password: _passwordController.text.trim(),
       );
+
+      await credential.user!.sendEmailVerification();
 
       await db.collection('users').doc(credential.user!.uid).set({
         'uid': credential.user!.uid,
@@ -173,20 +153,24 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      _showTopNotification(context, 'Account workspace secured successfully!');
-      context.go('/processing', extra: {'email': _emailController.text.trim()});
+      _showTopNotification(context, 'Workspace Generation Completed: Corporate credentials mapped successfully. Check target inbox execution link parameters to complete activation.');
+      
+      setState(() {
+        _isSignUpMode = false;
+        _identityController.text = _emailController.text;
+      });
     } on FirebaseAuthException catch (e) {
-      _showTopNotification(context, e.message ?? 'Sign up protocol execution fault.', isError: true);
+      _showTopNotification(context, e.message ?? 'Operational Failure: Internal validation structure script dropped execution tracking constraints.', isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isFormLoading = false);
     }
   }
 
-  // 🔑 UNIFIED MULTI-IDENTIFIER LOG IN MATRIX
+  // ✅ 2. UNIFIED LOG-IN MATRIX
   Future<void> _executeUnifiedLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isFormLoading = true);
     final db = FirebaseFirestore.instance;
     final input = _identityController.text.trim().toLowerCase();
     String? resolvedEmail;
@@ -206,45 +190,46 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       }
 
       if (resolvedEmail == null || resolvedEmail.isEmpty) {
-        _showTopNotification(context, 'No account found. Please sign up first.', isError: true);
+        _showTopNotification(context, 'Authentication Refused: No matching tenant record tracking values recognized by core processing node engines.', isError: true);
+        setState(() => _isFormLoading = false);
         return;
       }
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: resolvedEmail,
         password: _passwordController.text.trim(),
       );
 
-      _showTopNotification(context, 'Access verified. Loading engine dashboard environment.');
+      await userCredential.user!.reload();
+      User? currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null && !currentUser.emailVerified) {
+        _showTopNotification(context, 'Authentication Interrupted: Profile execution token requires verified confirmation signatures. Re-evaluate communication channels.', isError: true);
+        await FirebaseAuth.instance.signOut();
+        setState(() => _isFormLoading = false);
+        return;
+      }
+
+      _showTopNotification(context, 'Workspace Authorization Verified: User tracking matrix initialized cleanly. Transitioning workspace frames now.');
       context.go('/processing', extra: {'email': resolvedEmail});
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'wrong-password') {
-        _showTopNotification(context, 'No account found. Please sign up first.', isError: true);
-      } else {
-        _showTopNotification(context, e.message ?? 'Authentication mismatch error.', isError: true);
-      }
+      _showTopNotification(context, e.message ?? 'Access Violation: Credentials drop framework matching operations. Confirm parameter layout logic values.', isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isFormLoading = false);
     }
   }
 
-  // 🌐 STABLE GOOGLE PLATFORM COMPLIANT DEPLOYMENT SCHEME (v7+ Compliant)
+  // 🌐 3. CROSS-PLATFORM GOOGLE IDENTITY AUTHORIZATION LAYER
   Future<void> _executeGoogleAuthentication() async {
-    setState(() => _isLoading = true);
+    setState(() => _isGoogleLoading = true);
     final db = FirebaseFirestore.instance;
 
     try {
-      final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      GoogleAuthProvider googleProvider = GoogleAuthProvider();
+      googleProvider.addScope('email');
+      googleProvider.addScope('profile');
       
-      final authorizedScopes = await googleUser.authorizationClient.authorizeScopes(['email', 'profile']);
-
-      final OAuthCredential credential = GoogleAuthProvider.credential(
-        idToken: googleAuth.idToken,
-        accessToken: authorizedScopes.accessToken,
-      );
-
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithPopup(googleProvider);
       User? user = userCredential.user;
 
       if (user != null) {
@@ -254,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         if (!docSnapshot.exists) {
           await docRef.set({
             'uid': user.uid,
-            'fullName': user.displayName ?? 'Google Workspace Identity',
+            'fullName': user.displayName ?? 'Google Identity',
             'username': user.email!.split('@')[0].toLowerCase(),
             'email': user.email!.toLowerCase(),
             'phone': user.phoneNumber ?? '',
@@ -263,85 +248,77 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           });
         }
 
-        _showTopNotification(context, 'Google Sign-In successfully verified.');
+        _showTopNotification(context, 'Federated Identity Approved: Secure integration parameters parsed via structural verification engine modules.');
         context.go('/processing', extra: {'email': user.email!});
       }
     } catch (e) {
-      _showTopNotification(context, 'Google Authentication Protocol Error: ${e.toString()}', isError: true);
+      _showTopNotification(context, 'Federated Sync Aborted: Secure validation handshake dropped during cross-domain execution steps.', isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isGoogleLoading = false);
     }
   }
 
-  // 📱 DYNAMIC NATIVE SMARTPHONE VERIFICATION OPERATION ROUTINE
+  // 📱 4. DYNAMIC RESPONSIVE PHONE OTP ENGINE
   Future<void> _executePhoneVerification() async {
     if (_phoneController.text.length != 10) {
-      _showTopNotification(context, 'Enter a valid 10-digit smartphone data stream sequence.', isError: true);
+      _showTopNotification(context, 'Validation Error: Specified phone dynamic tracking string must constitute exactly 10 digital integer parameters.', isError: true);
       return;
     }
 
-    setState(() => _isLoading = true);
     final db = FirebaseFirestore.instance;
 
     try {
-      if (!_showOtpVerificationField) {
-        await FirebaseAuth.instance.verifyPhoneNumber(
-          phoneNumber: '+91${_phoneController.text.trim()}',
-          verificationCompleted: (PhoneAuthCredential credential) async {
-            await FirebaseAuth.instance.signInWithCredential(credential);
-            context.go('/processing', extra: {'phone': _phoneController.text});
-          },
-          verificationFailed: (FirebaseAuthException e) {
-            _showTopNotification(context, e.message ?? 'Telephony Link Handshake Fault', isError: true);
-          },
-          codeSent: (String verificationId, int? resendToken) {
-            setState(() {
-              _firebaseVerificationId = verificationId;
-              _showOtpVerificationField = true;
-            });
-            _showTopNotification(context, 'Secure login dynamic OTP token successfully pushed via SMS.');
-          },
-          codeAutoRetrievalTimeout: (String verificationId) {},
-        );
-      } else {
-        PhoneAuthCredential credential = PhoneAuthProvider.credential(
-          verificationId: _firebaseVerificationId!,
-          smsCode: _otpController.text.trim(),
-        );
-
-        UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-        final query = await db.collection('users').where('phone', isEqualTo: _phoneController.text.trim()).get();
-
-        if (query.docs.isEmpty) {
-          await db.collection('users').doc(userCredential.user!.uid).set({
-            'uid': userCredential.user!.uid,
-            'fullName': 'Mobile Link User Profile',
-            'username': 'client_${_phoneController.text.trim()}',
-            'email': '',
-            'phone': _phoneController.text.trim(),
-            'authProvider': 'phone',
-            'createdAt': FieldValue.serverTimestamp(),
+      if (kIsWeb) {
+        if (!_showOtpVerificationField) {
+          setState(() => _isOtpLoading = true);
+          _webConfirmationResult = await FirebaseAuth.instance.signInWithPhoneNumber(
+            '+91${_phoneController.text.trim()}',
+          );
+          setState(() {
+            _showOtpVerificationField = true;
+            _isOtpLoading = false;
           });
+          _showTopNotification(context, 'Handshake Initiated: Transmitting cryptographic temporary dynamic verification validation token block out via secure SMS protocols.');
+        } else {
+          if (_otpController.text.trim().isEmpty) {
+            _showTopNotification(context, 'Validation Failure: Synchronized security parameter verification tracking code entries are strictly mandatory.', isError: true);
+            return;
+          }
+          setState(() => _isOtpLoading = true);
+          UserCredential userCredential = await _webConfirmationResult!.confirm(_otpController.text.trim());
+          
+          final query = await db.collection('users').where('phone', isEqualTo: _phoneController.text.trim()).get();
+          if (query.docs.isEmpty) {
+            await db.collection('users').doc(userCredential.user!.uid).set({
+              'uid': userCredential.user!.uid,
+              'fullName': 'Mobile Profile Workspace',
+              'username': 'client_${_phoneController.text.trim()}',
+              'email': '',
+              'phone': _phoneController.text.trim(),
+              'authProvider': 'phone',
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          }
+          _showTopNotification(context, 'Telephony Verification Executed: Temporary cryptographic token verified against primary cloud registry instances.');
+          context.go('/processing', extra: {'phone': _phoneController.text.trim()});
         }
-
-        context.go('/processing', extra: {'phone': _phoneController.text.trim()});
       }
     } catch (e) {
-      _showTopNotification(context, e.toString(), isError: true);
+      _showTopNotification(context, 'Handshake Terminated: Cryptographic matching sequences threw verification structure parameters anomalies.', isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isOtpLoading = false);
     }
   }
 
-  // 🔄 DATABASE CORE PASSWORD FORGOT RESET ENGINE
+  // 🔄 5. PASSWORD FORGOT RESET ENGINE
   Future<void> _executeForgotPasswordReset() async {
     final input = _identityController.text.trim().toLowerCase();
     if (input.isEmpty) {
-      _showTopNotification(context, 'Please fill in the single-identity input configuration field to match accounts.', isError: true);
+      _showTopNotification(context, 'Parameters Incomplete: Request tracking requires a validated identification identity handle argument input string.', isError: true);
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isFormLoading = true);
     try {
       String? targetEmail = input.contains('@') ? input : null;
 
@@ -358,30 +335,43 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       }
 
       if (targetEmail == null || targetEmail.isEmpty) {
-        _showTopNotification(context, 'No tracking data profile records match the query criteria.', isError: true);
+        _showTopNotification(context, 'Verification Dropped: No recorded workspace registration instances correspond to the provided system input string.', isError: true);
         return;
       }
 
       await FirebaseAuth.instance.sendPasswordResetEmail(email: targetEmail);
-      _showTopNotification(context, 'Password structural reset authorization instructions pushed to email tracking asset.');
+      _showTopNotification(context, 'Transmission Complete: A security initialization reset dynamic URL parameter block was dispatched out.');
     } catch (e) {
-      _showTopNotification(context, 'Reset execution parameter layer fault: ${e.toString()}', isError: true);
+      _showTopNotification(context, 'Transmission Aborted: Communication node network layers returned a dynamic script dispatch fault.', isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isFormLoading = false);
     }
+  }
+
+  void _resetToDefaultCredentialsMode() {
+    setState(() {
+      _isPhoneAuthMode = false;
+      _showOtpVerificationField = false;
+      _phoneController.clear();
+      _otpController.clear();
+      _formKey.currentState?.reset();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 768;
+    final isDesktop = size.width > 1024;
+    final isTablet = size.width > 600 && size.width <= 1024;
+
+    final bool staticAnyActiveLoad = _isFormLoading || _isGoogleLoading || _isOtpLoading;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: Row(
         children: [
-          // Left Graphics Ambient Panel (Web & Tablet viewports)
+          // 💻 Left Canvas Segment View (Desktop Viewports)
           if (isDesktop)
             Expanded(
               child: AnimatedBuilder(
@@ -418,224 +408,327 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               ),
             ),
           
-          // Form Content Side (Responsive Mobile/Desktop Adaptive Framework)
-          Container(
-            width: isDesktop ? 460 : size.width,
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-            color: const Color(0xFF1E293B),
-            child: Center(
-              child: SingleChildScrollView(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_isSignUpMode ? 'Secure Registration Portal' : 'Workspace Authentication Portal', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
-                      const SizedBox(height: 24),
+          // 📱 Main Dynamic Authentication Panel Form Box
+          Expanded(
+            flex: isDesktop ? 0 : 1,
+            child: Container(
+              width: isDesktop ? 480 : (isTablet ? size.width * 0.65 : size.width),
+              margin: isTablet ? EdgeInsets.symmetric(horizontal: size.width * 0.175, vertical: 32) : EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: isTablet ? BorderRadius.circular(16) : BorderRadius.zero,
+              ),
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _isPhoneAuthMode 
+                              ? 'Secure OTP Gateway' 
+                              : (_isSignUpMode ? 'Secure Account Portal (Sign Up)' : 'Workspace Authorization (Log In)'), 
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white), 
+                          textAlign: TextAlign.center
+                        ),
+                        const SizedBox(height: 24),
 
-                      if (!_isSignUpMode) ...[
-                        TextFormField(
-                          controller: _identityController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Mobile number, username or email',
-                            labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                          ),
-                          validator: (v) => v!.isEmpty ? 'This identity field is strictly mandatory.' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Security Password',
-                            labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                          ),
-                          validator: (v) => v!.isEmpty ? 'Password parameter is completely mandatory.' : null,
-                        ),
-                      ] else ...[
-                        TextFormField(
-                          controller: _emailController,
-                          enabled: !_isEmailVerifiedSuccessfully,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Corporate Email Address',
-                            labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            suffixIcon: TextButton(
-                              onPressed: _isLoading ? null : _triggerEmailVerification,
-                              child: Text(_isEmailVerifiedSuccessfully ? 'Verified ✓' : 'Verify Link', style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
-                            ),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                          ),
-                          validator: (v) => !v!.contains('@') ? 'An active email verification link is mandatory.' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _fullNameController,
-                          enabled: _isEmailVerifiedSuccessfully,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Full Profile Legal Name',
-                            labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                          ),
-                          validator: (v) => v!.isEmpty ? 'Profile legal name parameters are mandatory.' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _usernameController,
-                          enabled: _isEmailVerifiedSuccessfully,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Unique Workspace Username Handle',
-                            labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                          ),
-                          validator: (v) => v!.isEmpty ? 'Unique identity configuration handle anchors are mandatory.' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _phoneController,
-                          enabled: _isEmailVerifiedSuccessfully,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: '10-Digit Mobile Link Connection',
-                            prefixText: '+91 ',
-                            prefixStyle: const TextStyle(color: Colors.white),
-                            labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                          ),
-                          validator: (v) => v!.length != 10 ? 'A verified 10-digit smartphone sequence is mandatory.' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _passwordController,
-                          enabled: _isEmailVerifiedSuccessfully,
-                          obscureText: true,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Account System Password',
-                            labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                          ),
-                          validator: (v) => v!.length < 6 ? 'Authentication password values require 6+ symbols minimum.' : null,
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : (_isSignUpMode ? _executeSecureSignUp : _executeUnifiedLogin),
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0066CC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                          child: _isLoading 
-                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : Text(_isSignUpMode ? 'Register Space Allocation' : 'Log In Workspace Space', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (!_isSignUpMode)
-                        TextButton(
-                          onPressed: _isLoading ? null : _executeForgotPasswordReset,
-                          child: const Text('Forgot password?', style: TextStyle(color: Colors.white70)),
-                        ),
-                      
-                      const Row(
-                        children: [
-                          Expanded(child: Divider(color: Colors.white12)),
-                          Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('OR', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
-                          Expanded(child: Divider(color: Colors.white12)),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (!_isSignUpMode) ...[
-                        TextFormField(
-                          controller: _phoneController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            labelText: 'Quick Login via Phone Vector',
-                            prefixText: '+91 ',
-                            prefixStyle: const TextStyle(color: Colors.white),
-                            labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (_showOtpVerificationField) ...[
+                        // 📱 VIEW 1: DEDICATED MOBILE PHONE OTP AUTHORIZATION GRID
+                        if (_isPhoneAuthMode) ...[
                           TextFormField(
-                            controller: _otpController,
+                            controller: _phoneController,
+                            enabled: !staticAnyActiveLoad,
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
-                              labelText: 'Enter 6-Digit SMS Code Key Token',
+                              labelText: 'Enter your phone number',
+                              prefixText: '+91 ',
+                              prefixStyle: const TextStyle(color: Colors.white),
                               labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
                               filled: true,
                               fillColor: const Color(0xFF0F172A),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                             ),
+                            validator: (v) => (v == null || v.length != 10) ? 'This metric field parameter calculation layout framework requires 10 digits.' : null,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
+                          if (_showOtpVerificationField) ...[
+                            TextFormField(
+                              controller: _otpController,
+                              enabled: !staticAnyActiveLoad,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: '6-Digit SMS Verification Token Code',
+                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                              validator: (v) => (_showOtpVerificationField && (v == null || v.isEmpty)) ? 'Dynamic cryptographic security parameter string index matching field entry is mandatory.' : null,
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: staticAnyActiveLoad ? null : _executePhoneVerification,
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0066CC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                              child: _isOtpLoading
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : Text(_showOtpVerificationField ? 'Verify Security Token Code' : 'Send Verification OTP', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 44,
+                            child: OutlinedButton.icon(
+                              onPressed: staticAnyActiveLoad ? null : _resetToDefaultCredentialsMode,
+                              icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF38BDF8), size: 18),
+                              label: const Text('Back to Login Credentials Workspace', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 13)),
+                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                            ),
+                          ),
+                        ]
+                        
+                        // 🔐 VIEW 2: STANDARD CREDENTIALS & SIGN-UP FLOW BLOCK
+                        else ...[
+                          if (!_isSignUpMode) ...[
+                            TextFormField(
+                              controller: _identityController,
+                              enabled: !staticAnyActiveLoad,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Mobile number, username, or email address',
+                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                              validator: (v) => v!.isEmpty ? 'This identification structural credential configuration field is required.' : null,
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _passwordController,
+                              enabled: !staticAnyActiveLoad,
+                              obscureText: _obscurePassword,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Security Access Password',
+                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                    color: const Color(0xFF94A3B8),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                              ),
+                              validator: (v) => v!.isEmpty ? 'Security authentication framework validation tracking password value is mandatory.' : null,
+                            ),
+                          ] else ...[
+                            TextFormField(
+                              controller: _emailController,
+                              enabled: !staticAnyActiveLoad,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Email Address',
+                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                              validator: (v) => (v == null || !v.contains('@')) ? 'Please enter a valid structure email address configuration parameter layout.' : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _fullNameController,
+                              enabled: !staticAnyActiveLoad,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Full Legal Name',
+                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                              validator: (v) => v!.isEmpty ? 'Legal user execution entry naming logic argument is required.' : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _usernameController,
+                              enabled: !staticAnyActiveLoad,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Unique Username Handle',
+                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                              validator: (v) => v!.isEmpty ? 'Setting a system unique index tracking identity marker handle string is mandatory.' : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _phoneController,
+                              enabled: !staticAnyActiveLoad,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: '10-Digit Mobile Number',
+                                prefixText: '+91 ',
+                                prefixStyle: const TextStyle(color: Colors.white),
+                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                              validator: (v) => (v == null || v.length != 10) ? 'A verified 10-digit primary structural communication node identity parameter value string is required.' : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _passwordController,
+                              enabled: !staticAnyActiveLoad,
+                              obscureText: _obscurePassword,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'System Security Password',
+                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                    color: const Color(0xFF94A3B8),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                              ),
+                              validator: (v) => (v == null || v.length < 6) ? 'Password architectural tracking parameters require structural complexity containing minimum 6 elements.' : null,
+                            ),
+                          ],
+                          const SizedBox(height: 24),
+
+                          // Main Platform Account Submission Action Gate Button
+                          SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: staticAnyActiveLoad ? null : (_isSignUpMode ? _executeSecureSignUp : _executeUnifiedLogin),
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0066CC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                              child: _isFormLoading 
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : Text(_isSignUpMode ? 'Register New Space Profile' : 'Execute Workspace Login', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          if (!_isSignUpMode) ...[
+                            TextButton(
+                              onPressed: staticAnyActiveLoad ? null : _executeForgotPasswordReset,
+                              child: const Text('Forgot Password Mapping Engine?', style: TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+                            ),
+                            const Row(
+                              children: [
+                                Expanded(child: Divider(color: Colors.white12)),
+                                Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('OR', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.bold))),
+                                Expanded(child: Divider(color: Colors.white12)),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Interactive trigger routing workspace flow explicitly to dedicated Mobile Viewport
+                            SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: staticAnyActiveLoad ? null : () {
+                                  setState(() {
+                                    _isPhoneAuthMode = true;
+                                    _formKey.currentState?.reset();
+                                  });
+                                },
+                                icon: const Icon(Icons.phone_android_rounded, color: Colors.white, size: 18),
+                                label: const Text('Continue with Mobile Phone OTP verification', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
+                          if (_isSignUpMode) ...[
+                            const Row(
+                              children: [
+                                Expanded(child: Divider(color: Colors.white12)),
+                                Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('OR', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.bold))),
+                                Expanded(child: Divider(color: Colors.white12)),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // 🌐 Clean & Web-Compliant Google Workspace Button Component
+                          SizedBox(
+                            height: 48,
+                            child: OutlinedButton(
+                              onPressed: staticAnyActiveLoad ? null : _executeGoogleAuthentication,
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.white24),
+                                backgroundColor: const Color(0xFF0F172A),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: _isGoogleLoading
+                                  ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
+                                  : const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.g_mobiledata_rounded, color: Colors.amber, size: 30),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Continue with Google Workspace Identity',
+                                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                          ),)
                         ],
+                        const SizedBox(height: 24),
+
+                        // Bottom Layout View Switcher Configuration Button (Sign Up / Login Switcher)
                         SizedBox(
-                          width: double.infinity,
-                          height: 40,
+                          height: 52,
                           child: OutlinedButton(
-                            onPressed: _isLoading ? null : _executePhoneVerification,
-                            style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24)),
-                            child: Text(_showOtpVerificationField ? 'Verify Native Token Key' : 'Push Dynamic Mobile OTP', style: const TextStyle(color: Colors.white)),
+                            onPressed: staticAnyActiveLoad ? null : () {
+                              setState(() {
+                                _isSignUpMode = !_isSignUpMode;
+                                _isPhoneAuthMode = false;
+                                _showOtpVerificationField = false;
+                                _formKey.currentState?.reset();
+                              });
+                            },
+                            style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFF0066CC)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                            child: Text(
+                              _isSignUpMode ? 'Existing Space Check? Login' : 'Provision New Tenant Space (Sign Up)', 
+                              style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 12),
                       ],
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _executeGoogleAuthentication,
-                          icon: const Icon(Icons.g_mobiledata_rounded, color: Colors.red, size: 28),
-                          label: const Text('Continue with Google Platform', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() {
-                              _isSignUpMode = !_isSignUpMode;
-                              _formKey.currentState?.reset();
-                            });
-                          },
-                          style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFF0066CC)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                          child: Text(_isSignUpMode ? 'Log into existing system profile' : 'Deploy new structural space', style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
