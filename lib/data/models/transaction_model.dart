@@ -1,67 +1,51 @@
 class TransactionModel {
   final String id;
-  final String customerId;
-  final String shopId;
-  final String ownerId;
   final String productName;
-  final int quantity;
   final double price;
-  final double credit; // User received cash
-  final double debit;  // User gave credit
-  final double runningTotal;
-  final int timestamp;
-  final String? notes;
-  final bool isPending;
+  final String type; // 'DEBIT' किंवा 'CREDIT'
+  final DateTime date;
+  final String commitMessage;
+  final bool isEdited;
+  final double runningTotal; // 🟢 final केले आणि Null-safety फिक्स केली
+  final int quantity;        // 🟢 'var' ऐवजी 'final int' प्रकार सुरक्षित केला
 
   TransactionModel({
     required this.id,
-    required this.customerId,
-    required this.shopId,
-    required this.ownerId,
     required this.productName,
-    this.quantity = 1,
-    this.price = 0.0,
-    required this.credit,
-    required this.debit,
-    required this.runningTotal,
-    required this.timestamp,
-    this.notes,
-    this.isPending = false,
+    required this.price,
+    required this.type,
+    required this.date,
+    this.commitMessage = '',
+    this.isEdited = false,
+    this.runningTotal = 0.0, // 🟢 डिफॉल्ट व्हॅल्यू सेट केली
+    this.quantity = 1,       // 🟢 डिफॉल्ट क्वांटिटी 1 सेट केली
   });
 
-  factory TransactionModel.fromJson(Map<String, dynamic> json) {
-    return TransactionModel(
-      id: json['id'] as String,
-      customerId: json['customerId'] as String,
-      shopId: json['shopId'] as String,
-      ownerId: json['ownerId'] as String,
-      productName: json['productName'] as String,
-      quantity: json['quantity'] as int? ?? 1,
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      credit: (json['credit'] as num?)?.toDouble() ?? 0.0,
-      debit: (json['debit'] as num?)?.toDouble() ?? 0.0,
-      runningTotal: (json['runningTotal'] as num?)?.toDouble() ?? 0.0,
-      timestamp: json['timestamp'] as int,
-      notes: json['notes'] as String?,
-      isPending: json['isPending'] as bool? ?? false,
-    );
-  }
+  // 🟢 pdf_generator.dart साठी आवश्यक कोअर गेटर्स
+  int get timestamp => date.millisecondsSinceEpoch;
+  double get debit => type == 'DEBIT' ? price : 0.0;
+  double get credit => type == 'CREDIT' ? price : 0.0;
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'customerId': customerId,
-      'shopId': shopId,
-      'ownerId': ownerId,
-      'productName': productName,
-      'quantity': quantity,
-      'price': price,
-      'credit': credit,
-      'debit': debit,
-      'runningTotal': runningTotal,
-      'timestamp': timestamp,
-      'notes': notes,
-      'isPending': isPending,
-    };
+  // 🟢 सर्व नवीन फील्ड्ससह सुसज्ज copyWith मेथड
+  TransactionModel copyWith({
+    String? productName,
+    double? price,
+    String? type,
+    String? commitMessage,
+    bool? isEdited,
+    double? runningTotal,
+    int? quantity,
+  }) {
+    return TransactionModel(
+      id: id,
+      productName: productName ?? this.productName,
+      price: price ?? this.price,
+      type: type ?? this.type,
+      date: date,
+      commitMessage: commitMessage ?? this.commitMessage,
+      isEdited: isEdited ?? this.isEdited,
+      runningTotal: runningTotal ?? this.runningTotal,
+      quantity: quantity ?? this.quantity,
+    );
   }
 }

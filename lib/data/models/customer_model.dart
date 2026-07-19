@@ -1,62 +1,45 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class CustomerModel {
   final String id;
-  final String shopId;
-  final String ownerId;
   final String name;
   final String phone;
-  final String? email;
-  final String? address;
-  final double creditLimit;
-  final double openingBalance;
-  final List<String> tags;
-  final bool isFavourite;
-  final bool isBlocked;
+  final String shopId;
+  final double balance; // 👈 UI आणि उधारीच्या कॅल्क्युलेशनसाठी
+  final bool isFavorite; // 👈 फिल्टरसाठी
+  final bool isBlocked; // 👈 फिल्टरसाठी
 
   CustomerModel({
     required this.id,
-    required this.shopId,
-    required this.ownerId,
     required this.name,
     required this.phone,
-    this.email,
-    this.address,
-    this.creditLimit = 50000.0,
-    this.openingBalance = 0.0,
-    this.tags = const [],
-    this.isFavourite = false,
-    this.isBlocked = false,
+    required this.shopId,
+    required this.balance,
+    required this.isFavorite,
+    required this.isBlocked,
   });
 
-  factory CustomerModel.fromJson(Map<String, dynamic> json) {
+  factory CustomerModel.fromDoc(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
     return CustomerModel(
-      id: json['id'] as String,
-      shopId: json['shopId'] as String,
-      ownerId: json['ownerId'] as String,
-      name: json['name'] as String,
-      phone: json['phone'] as String,
-      email: json['email'] as String?,
-      address: json['address'] as String?,
-      creditLimit: (json['creditLimit'] as num?)?.toDouble() ?? 50000.0,
-      openingBalance: (json['openingBalance'] as num?)?.toDouble() ?? 0.0,
-      tags: List<String>.from(json['tags'] ?? []),
-      isFavourite: json['isFavourite'] as bool? ?? false,
-      isBlocked: json['isBlocked'] as bool? ?? false,
+      id: doc.id,
+      name: data['name'] ?? '',
+      phone: data['phone'] ?? '',
+      shopId: data['shopId'] ?? '',
+      // जुन्या डेटाबेसमध्ये 'dueAmount' असेल तर तो 'balance' म्हणून मॅप होईल
+      balance: (data['balance'] ?? data['dueAmount'] ?? 0).toDouble(),
+      isFavorite: data['isFavorite'] ?? false,
+      isBlocked: data['isBlocked'] ?? false,
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'shopId': shopId,
-      'ownerId': ownerId,
       'name': name,
       'phone': phone,
-      'email': email,
-      'address': address,
-      'creditLimit': creditLimit,
-      'openingBalance': openingBalance,
-      'tags': tags,
-      'isFavourite': isFavourite,
+      'shopId': shopId,
+      'balance': balance,
+      'isFavorite': isFavorite,
       'isBlocked': isBlocked,
     };
   }

@@ -1,151 +1,165 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../viewmodels/shop_viewmodel.dart';
 import '../../../core/providers/global_provider_hub.dart';
-import '../../widgets/glass_card.dart';
+import '../../viewmodels/shop_viewmodel.dart'; // 👈 तुमचे शॉप व्ह्यू-मॉडेल
 
-class ShopManageScreen extends ConsumerStatefulWidget {
-  final String currentUserId;
-
-  const ShopManageScreen({
-    super.key,
-    required this.currentUserId,
-  });
+class ShopManageScreen extends ConsumerWidget {
+  const ShopManageScreen({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<ShopManageScreen> createState() => _ShopManageScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 🏪 सध्या ॲक्टिव्ह असलेला शॉप आयडी मिळवा
+    final currentActiveShopId = ref.watch(activeShopIdProvider);
+    
+    // 🔍 स्ट्रीम किंवा फ्युचर प्रोव्हाइडरद्वारे या दुकानदाराच्या सर्व दुकानांची लिस्ट मिळवा
+    // (सध्यातरी टेस्टिंगसाठी आपण डमी लिस्ट वापरत आहोत जी तुमच्या `shopViewModel` शी कनेक्ट होईल)
+    final mockShops = [
+      {'id': 'SHOP_KIRANA_01', 'name': 'माऊली किराणा स्टोअर्स', 'type': 'किराणा दुकान'},
+      {'id': 'SHOP_CLOTH_02', 'name': 'जगदंबा मेन्स वेअर', 'type': 'कपड्यांचे दुकान'},
+      {'id': 'SHOP_AGRO_03', 'name': 'बळीराजा ॲग्रो एजन्सी', 'type': 'कृषी केंद्र'},
+    ];
 
-class _ShopManageScreenState extends ConsumerState<ShopManageScreen> {
-  final _nameController = TextEditingController();
-  final _addressController = TextEditingController();
-  String _selectedBusinessType = 'Grocery';
-
-  final List<String> _businessTypes = ['Grocery', 'Medical', 'Clothing', 'Electronics', 'Others'];
-
-  void _createNewShopProfile() {
-    if (_nameController.text.isEmpty) return;
-
-    final String newShopId = 'shop_${DateTime.now().millisecondsSinceEpoch}';
-
-    ref.read(shopProvider.notifier).createNewShop(
-          id: newShopId,
-          ownerId: widget.currentUserId,
-          name: _nameController.text.trim(),
-          businessType: _selectedBusinessType,
-          address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
-        );
-
-    // तयार झाल्यावर इनपुट बॉक्स रिकामे करा
-    _nameController.clear();
-    _addressController.clear();
-    Navigator.pop(context);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('New business shop registered successfully!'), backgroundColor: Colors.green),
-    );
-  }
-
-  void _showCreateShopDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Business Store'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Business / Shop Name', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _selectedBusinessType,
-              decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-              items: _businessTypes.map((type) {
-                return DropdownMenuItem(value: type, child: Text(type));
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedBusinessType = val);
-              },
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _addressController,
-              decoration: const InputDecoration(labelText: 'Physical Address', border: OutlineInputBorder()),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(onPressed: _createNewShopProfile, child: const Text('Register')),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final shops = ref.watch(shopProvider);
-    final activeShopId = ref.watch(activeShopIdProvider);
+    final size = MediaQuery.of(context).size;
+    final isDesktop = size.width > 900;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Switch Business Workspace'),
-      ),
-      body: shops.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.store_outlined, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text('No shops registered yet. Build your first shop workspace!', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(onPressed: _showCreateShopDialog, child: const Text('Create Shop')),
-                ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 🏪 हेडिंग आणि वर्णन
+              const Text(
+                'माझी दुकाने (Manage Shops)',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: shops.length,
-              itemBuilder: (context, index) {
-                final shop = shops[index];
-                final isCurrentActive = shop.id == activeShopId;
+              const SizedBox(height: 6),
+              const Text(
+                'तुम्ही ज्या दुकानाचा डेटा पाहू इच्छिता, ते दुकान निवडा. डेटा पूर्णपणे सुरक्षित आणि आयसोलेटेड राहील.',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 24),
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: GlassCard(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: isCurrentActive ? Colors.green.shade100 : Colors.deepPurple.shade50,
-                        child: Icon(
-                          Icons.storefront_outlined,
-                          color: isCurrentActive ? Colors.green : Colors.deepPurple,
+              // 🖥️ डेस्कटॉपवर ३ कॉलम ग्रिड, मोबाईलवर १ कॉलम व्हर्टिकल लिस्ट
+              Expanded(
+                child: GridView.builder(
+                  itemCount: mockShops.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: isDesktop ? 3 : 1,
+                    childAspectRatio: isDesktop ? 2.5 : 4,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                  ),
+                  itemBuilder: (context, index) {
+                    final shop = mockShops[index];
+                    final isActive = currentActiveShopId == shop['id'];
+
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isActive ? Colors.deepPurple.shade700 : Colors.grey.shade200,
+                          width: isActive ? 2.5 : 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isActive 
+                                ? Colors.deepPurple.withOpacity(0.1) 
+                                : Colors.black.withOpacity(0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          // ⚡ शॉप चेंज मॅजिक: ग्लोबल शॉप आयडी अपडेट करा
+                          ref.read(activeShopIdProvider.notifier).state = shop['id'];
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('यशस्वीरित्या बदलले: ${shop['name']}'),
+                              backgroundColor: Colors.deepPurple.shade800,
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              // 🏪 शॉप आयकॉन
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isActive ? Colors.deepPurple.shade50 : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.storefront,
+                                  color: isActive ? Colors.deepPurple.shade800 : Colors.grey.shade600,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              
+                              // 📝 शॉप माहिती
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      shop['name']!,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: isActive ? Colors.deepPurple.shade900 : Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      shop['type']!,
+                                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              
+                              // ✅ ॲक्टिव्ह इंडिकेटर
+                              if (isActive)
+                                Icon(Icons.check_circle, color: Colors.deepPurple.shade700, size: 24)
+                              else
+                                const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14),
+                            ],
+                          ),
                         ),
                       ),
-                      title: Text(shop.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('Category: ${shop.businessType}'),
-                      trailing: isCurrentActive
-                          ? const Icon(Icons.check_circle, color: Colors.green)
-                          : const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        // सध्याचे सक्रिय शॉप आयसोलेशन बदला
-                        ref.read(activeShopIdProvider.notifier).state = shop.id;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Switched workspace context to: ${shop.name}')),
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateShopDialog,
-        backgroundColor: Colors.deepPurple,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      
+      // ➕ नवीन दुकान जोडण्यासाठी बटन
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // 🚧 नवीन दुकान जोडण्याचा डायलॉग किंवा बॉटम शीट इथे येईल
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('नवीन दुकान जोडण्याची सुविधा लवकरच येत आहे!')),
+          );
+        },
+        backgroundColor: Colors.deepPurple.shade700,
         foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add_business),
+        label: const Text('नवीन दुकान जोडा', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

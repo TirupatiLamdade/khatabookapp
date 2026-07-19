@@ -1,226 +1,124 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/currency_formatter.dart';
-import '../../../domain/usecases/auto_backup_service.dart';
-import '../../widgets/glass_card.dart';
+import '../../../core/providers/global_provider_hub.dart';
+import 'developer_settings_view.dart';
 
-class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+class SettingScreen extends ConsumerWidget {
+  const SettingScreen({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final AutoBackupService _backupService = AutoBackupService();
-  bool _isAutoBackupEnabled = true;
-  String _selectedCurrency = 'INR';
-
-  // 🔄 बॅकअप पेलोड जनरेशन आणि मॅन्युअल बॅकअप ट्रिगर
-  Future<void> _triggerManualBackup() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final payload = await _backupService.generateBackupPayload('khatabook_passphrase_123');
-      Navigator.pop(context); // प्रोग्रेस डायलॉग बंद करा
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.cloud_done, color: Colors.green),
-              SizedBox(width: 8),
-              Text('Backup Successful'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Your encrypted database backup string has been created safely:'),
-              const SizedBox(height: 12),
-              SelectableText(
-                payload.substring(0, 100) + '...', // सुरक्षेसाठी फक्त सुरवातीचा भाग दाखवला आहे
-                style: const TextStyle(fontSize: 11, color: Colors.grey, fontFamily: 'monospace'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Dismiss'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Backup execution failed.'), backgroundColor: Colors.redAccent),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentTheme = ref.watch(themeProvider);
-    final themeNotifier = ref.read(themeProvider.notifier);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeShopId = ref.watch(activeShopIdProvider) ?? "निवडलेले नाही";
+    final size = MediaQuery.of(context).size;
+    final isDesktop = size.width > 900;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Application Settings'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          // 🎨 विभाग १: थीम आणि डिझाईन सेटिंग्ज (Theme Settings)
-          const Text('Theme Configuration', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-          const SizedBox(height: 8),
-          GlassCard(
-            child: Column(
-              children: [
-                RadioListTile<ThemeModeOption>(
-                  title: const Text('Light Mode'),
-                  value: ThemeModeOption.light,
-                  groupValue: currentTheme,
-                  onChanged: (val) {
-                    if (val != null) themeNotifier.setTheme(val);
-                  },
-                ),
-                RadioListTile<ThemeModeOption>(
-                  title: const Text('Dark Mode'),
-                  value: ThemeModeOption.dark,
-                  groupValue: currentTheme,
-                  onChanged: (val) {
-                    if (val != null) themeNotifier.setTheme(val);
-                  },
-                ),
-                RadioListTile<ThemeModeOption>(
-                  title: const Text('AMOLED Black (True Black)'),
-                  value: ThemeModeOption.amoled,
-                  groupValue: currentTheme,
-                  onChanged: (val) {
-                    if (val != null) themeNotifier.setTheme(val);
-                  },
-                ),
-              ],
+      body: SafeArea(
+        child: Center(
+          child: Container(
+            // 🖥️ डेस्कटॉपवर लुक प्रोफेशनल ठेवण्यासाठी विड्थ पॅक केली आहे
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 700 : double.infinity,
             ),
-          ),
-          const SizedBox(height: 24),
-
-          // 🛡️ विभाग २: सुरक्षा आणि गोपनीयतेचे नियम (Security Settings)
-          const Text('Security & Access Control', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-          const SizedBox(height: 8),
-          GlassCard(
-            child: Column(
+            padding: const EdgeInsets.all(16.0),
+            child: ListView(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.pin, color: Colors.deepPurple),
-                  title: const Text('Setup Security PIN Lock'),
-                  subtitle: const Text('Create a secure 4-digit master pin access lock'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    context.push('/pin_lock', extra: {'isSettingPin': true});
-                  },
+                const Text(
+                  'ॲप सेटिंग्ज (Settings)',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-                const Divider(height: 1),
-                SwitchListTile(
-                  title: const Text('Auto-Backup Daily'),
-                  subtitle: const Text('Keep cloud data backups synchronized instantly'),
-                  value: _isAutoBackupEnabled,
-                  onChanged: (val) {
-                    setState(() {
-                      _isAutoBackupEnabled = val;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-          // 🪙 विभाग ३: प्रादेशिक आणि चलन सेटिंग्ज (Regional Settings)
-          const Text('Regional & Currency Preferences', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-          const SizedBox(height: 8),
-          GlassCard(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.currency_exchange, color: Colors.deepPurple),
-                  title: const Text('Business Currency Symbol'),
-                  subtitle: Text('Current: $_selectedCurrency (${CurrencyFormatter.getSelectedCurrencySymbol()})'),
-                  trailing: PopupMenuButton<String>(
-                    icon: const Icon(Icons.edit_outlined),
-                    onSelected: (val) {
-                      setState(() {
-                        _selectedCurrency = val;
-                        CurrencyFormatter.updateCurrencyConfiguration(val);
-                      });
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'INR', child: Text('Indian Rupee (₹)')),
-                      const PopupMenuItem(value: 'USD', child: Text('US Dollar (\$)')),
-                      const PopupMenuItem(value: 'EUR', child: Text('Euro (€)')),
-                    ],
+                // 🏪 सध्याचे दुकान कार्ड
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.deepPurple.shade50,
+                      child: Icon(Icons.storefront, color: Colors.deepPurple.shade800),
+                    ),
+                    title: const Text('सक्रिय दुकान आयडी', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    subtitle: Text(activeShopId, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+                    trailing: TextButton(
+                      onPressed: () {
+                        // मुख्य डॅशबोर्डवरील शॉप इंडेक्स (१) वर न्यावे
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('दुकान बदलण्यासाठी मुख्य मेनूमधील "माझी दुकाने" वर जा.')),
+                        );
+                      },
+                      child: const Text('बदला'),
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-          // 🔄 विभाग ४: मॅनेजमेंट आणि डेटा कंट्रोल्स (Data Management)
-          const Text('Data Administration', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-          const SizedBox(height: 8),
-          GlassCard(
-            child: Column(
-              children: [
+                // 🛠️ जनरल सेटिंग्स ग्रुप
+                const Text('सामान्य पर्याय', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                const Divider(),
+                
                 ListTile(
-                  leading: const Icon(Icons.backup_outlined, color: Colors.deepPurple),
-                  title: const Text('Perform Secure Manual Backup'),
-                  subtitle: const Text('Compile and encrypt database ledger immediately'),
-                  trailing: const Icon(Icons.sync_outlined),
-                  onTap: _triggerManualBackup,
+                  leading: const Icon(Icons.notifications_none),
+                  title: const Text('पुश नोटिफिकेशन (FCM)'),
+                  subtitle: const Text('व्यवहारांचे मेसेज आणि अलर्ट कॉन्फिगर करा'),
+                  trailing: Switch(value: true, onChanged: (val) {}),
                 ),
-                const Divider(height: 1),
+                
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.red),
-                  title: const Text('Clear All Local Cache', style: TextStyle(color: Colors.red)),
-                  subtitle: const Text('Purges offline database. Use with extreme caution!'),
+                  leading: const Icon(Icons.language),
+                  title: const Text('ॲपची भाषा (Language)'),
+                  subtitle: const Text('मराठी / English / हिंदी'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () {},
+                ),
+
+                const SizedBox(height: 24),
+
+                // 👨‍💻 डेव्हलपर पर्याय ग्रुप
+                const Text('प्रगत पर्याय (Advanced)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                const Divider(),
+
+                ListTile(
+                  leading: const Icon(Icons.developer_mode, color: Colors.blue),
+                  title: const Text('डेव्हलपर सेटिंग्स (Developer Options)'),
+                  subtitle: const Text('लोकल डेटाबेस कॅश आणि लॉग्स तपासण्यासाठी'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                   onTap: () {
-                    // कॅश साफ करण्यासाठी अलर्ट दाखवा
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Are you absolutely sure?'),
-                        content: const Text('This will purge your encrypted local offline storage boxes. Unsaved data will be lost.'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Local data cache cleared successfully.')),
-                              );
-                            },
-                            child: const Text('Purge Cache', style: TextStyle(color: Colors.red)),
-                          ),
-                        ],
-                      ),
+                    // डेव्हलपर व्ह्यू स्क्रीन उघडा
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DeveloperSettingsView()),
                     );
                   },
                 ),
+
+                const SizedBox(height: 32),
+
+                // 🚪 लॉगआउट बटन
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // ग्लोबल शॉप आयडी साफ करा आणि लॉगिन स्क्रीनवर परत जा
+                    ref.read(activeShopIdProvider.notifier).state = null;
+                    context.go('/login');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade50,
+                    foregroundColor: Colors.red.shade700,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.red.shade200),
+                    ),
+                  ),
+                  icon: const Icon(Icons.logout),
+                  label: const Text('ॲपमधून लॉगआउट करा', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1,15 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../presentation/viewmodels/customer_viewmodel.dart';
-import '../../presentation/viewmodels/transaction_viewmodel.dart';
-import '../../data/models/customer_model.dart';
 
-// डिफ़ॉल्ट रूप से पहली शॉप आईडी सेट करें
-final activeShopIdProvider = StateProvider<String>((ref) => 'default_shop_001');
+// सध्या लॉगिन असलेल्या दुकानदाराचा युनिक शॉप आयडी साठवण्यासाठी
+// हा आयडी बदलला की पूर्ण ॲपचा डेटा ऑटोमॅटिकली त्या दुकानाचा लोड होईल
+final activeShopIdProvider = StateProvider<String?>((ref) => null);
 
-// सिलेक्टेड शॉप के आधार पर फ़िल्टर किए गए ग्राहकों की सूची
-final filteredCustomerProvider = Provider<List<CustomerModel>>((ref) {
-  final activeShopId = ref.watch(activeShopIdProvider);
-  final allCustomers = ref.watch(customerProvider);
-  
-  return allCustomers.where((customer) => customer.shopId == activeShopId).toList();
+// युझर लॉगिन आहे की नाही हे तपासण्यासाठी
+final isAuthenticatedProvider = Provider<bool>((ref) {
+  final shopId = ref.watch(activeShopIdProvider);
+  return shopId != null;
 });

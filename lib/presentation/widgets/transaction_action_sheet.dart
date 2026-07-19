@@ -1,45 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../viewmodels/transaction_viewmodel.dart';
-import '../../core/utils/transliteration_service.dart';
+import '../../../core/providers/global_provider_hub.dart';
 
 class TransactionActionSheet extends ConsumerStatefulWidget {
-  final bool isDebitMode; // true = Gave Credit (उधार), false = Received Cash (जमा)
-  final String customerId;
-  final String shopId;
-  final String ownerId;
-
-  const TransactionActionSheet({
-    super.key,
-    required this.isDebitMode,
-    required this.customerId,
-    required this.shopId,
-    required this.ownerId,
-  });
-
-  // बॉटम शीट उघडण्यासाठी सोपी आणि स्टँडर्ड स्टेटिक पद्धत (Static Method Caller)
-  static void show(
-    BuildContext context, {
-    required bool isDebitMode,
-    required String customerId,
-    required String shopId,
-    required String ownerId,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: TransactionActionSheet(
-          isDebitMode: isDebitMode,
-          customerId: customerId,
-          shopId: shopId,
-          ownerId: ownerId,
-        ),
-      ),
-    );
-  }
+  const TransactionActionSheet({Key? key}) : super(key: key);
 
   @override
   ConsumerState<TransactionActionSheet> createState() => _TransactionActionSheetState();
@@ -47,205 +11,163 @@ class TransactionActionSheet extends ConsumerStatefulWidget {
 
 class _TransactionActionSheetState extends ConsumerState<TransactionActionSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _productNameController = TextEditingController();
-  final _quantityController = TextEditingController(text: '1');
-  final _priceController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _amountController = TextEditingController();
-  final _notesController = TextEditingController();
+  bool _isLoading = false;
 
-  @override
-  void dispose() {
-    _productNameController.dispose();
-    _quantityController.dispose();
-    _priceController.dispose();
-    _amountController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  // 📝 संख्या (Quantity) आणि प्रति नग किंमत (Price) बदलल्यावर एकूण रक्कम स्वयंचलित मोजा (Auto-multiplier)
-  void _calculateTotalAmount() {
-    final double qty = double.tryParse(_quantityController.text) ?? 0;
-    final double price = double.tryParse(_priceController.text) ?? 0;
-    
-    if (qty > 0 && price > 0) {
-      setState(() {
-        _amountController.text = (qty * price).toStringAsFixed(2);
-      });
-    }
-  }
-
-  // 💾 हाइव्ह आणि सिंक रांगेत व्यवहार जतन करा (Save Entry Call)
-  void _submitTransaction() {
+  void _submitData() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final double enteredAmount = double.parse(_amountController.text.trim());
-    final double creditVal = widget.isDebitMode ? 0.0 : enteredAmount;
-    final double debitVal = widget.isDebitMode ? enteredAmount : 0.0;
+    setState(() => _isLoading = true);
 
-    ref.read(transactionProvider.notifier).postTransaction(
-          id: 'tx_${DateTime.now().millisecondsSinceEpoch}',
-          customerId: widget.customerId,
-          shopId: widget.shopId,
-          ownerId: widget.ownerId,
-          productName: _productNameController.text.trim(),
-          quantity: int.parse(_quantityController.text.trim()),
-          price: double.tryParse(_priceController.text.trim()) ?? 0.0,
-          credit: creditVal,
-          debit: debitVal,
-          notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-        );
+    // 🔒 मल्टि-टेनन्सी सुरक्षा: सध्या चालू असलेला शॉप आयडी मिळवा
+    final currentShopId = ref.read(activeShopIdProvider);
 
-    Navigator.pop(context); // यशस्वी रकान्यानंतर शीट बंद करा
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(widget.isDebitMode ? 'Credit (उधार) entry recorded!' : 'Cash Received (जमा) entry recorded!'),
-        backgroundColor: widget.isDebitMode ? Colors.redAccent : Colors.green,
-      ),
-    );
+    if (currentShopId == null) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('त्रुटी: सक्रिय दुकान सापडले नाही. कृपया पुन्हा लॉगिन करा.')),
+      );
+      return;
+    }
+
+    // 🚧 इथे तुमच्या व्ह्यू-मॉडेलची मेथड कॉल होईल (उदा. ref.read(customerViewModelProvider.notifier).addCustomer(...))
+    // ज्याच्या आत आपण हा `currentShopId` पाठवून डेटाबेसमध्ये सेव्ह करू.
+    await Future.delayed(const Duration(seconds: 15)); // डमी नेटवर्क डिले
+
+    setState(() => _isLoading = false);
+    
+    if (mounted) {
+      Navigator.pop(context); // यशस्वीरित्या सेव्ह झाल्यावर शीट बंद करा
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_nameController.text} यशस्वीरित्या जोडले गेले!'),
+          backgroundColor: Colors.green.shade800,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+    final size = MediaQuery.of(context).size;
+    final isDesktop = size.width > 900;
+
+    // कीबोर्ड उघडल्यावर स्क्रीन वर ढकलण्यासाठी पॅडिंग
+    return Padding(
+      padding: EdgeInsets.only(
+        top: 24,
+        left: 24,
+        right: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      padding: const EdgeInsets.all(24.0),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
+      child: Container(
+        // डेस्कटॉपवर विड्थ नियंत्रित ठेवण्यासाठी
+        constraints: BoxConstraints(
+          maxWidth: isDesktop ? 500 : double.infinity,
+        ),
+        child: Form(
+          key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.isDebitMode ? 'Gave Credit (उधार नोंद)' : 'Received Cash (जमा नोंद)',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: widget.isDebitMode ? Colors.red : Colors.green,
+              // 🔝 वरची छोटी दांडी (मोबाईल इंडिकेटर)
+              if (!isDesktop)
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  )
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 16),
-
-              // Particulars / Product Name Input Field (विद ऑटो-लिप्यांतरण)
-              TextFormField(
-                controller: _productNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Product / Description',
-                  hintText: 'e.g., Grocery Items, Payment, Mobile Service',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.shopping_bag_outlined),
                 ),
-                onChanged: (val) {
-                  // फोनेटिक ऑटो-ट्रांसलिट्रेशन
-                  final converted = TransliterationService.processRealtimeInput(val);
-                  if (converted != val) {
-                    _productNameController.value = _productNameController.value.copyWith(
-                      text: converted,
-                      selection: TextSelection.collapsed(offset: converted.length),
-                    );
-                  }
-                },
-                validator: (val) => val == null || val.isEmpty ? 'Please enter transaction particulars' : null,
+              
+              const Text(
+                '👤 नवीन ग्राहक नोंदवा',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 16),
-
-              // Qty and Price Inputs (फक्त उधारीच्या मोडमध्ये आवश्यक असू शकते)
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _quantityController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Quantity', border: OutlineInputBorder()),
-                      onChanged: (_) => _calculateTotalAmount(),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _priceController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Unit Price (₹)', border: OutlineInputBorder()),
-                      onChanged: (_) => _calculateTotalAmount(),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 4),
+              Text(
+                'हा ग्राहक तुमच्या सध्याच्या दुकानात जोडला जाईल.',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
-              // Net Transaction Amount
+              // 📝 नाव इनपुट
               TextFormField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                decoration: const InputDecoration(
-                  labelText: 'Final Transaction Amount (₹) *',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.currency_rupee),
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'ग्राहकाचे नाव',
+                  prefixIcon: const Icon(Icons.person_outline),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                validator: (val) {
-                  if (val == null || val.isEmpty) return 'Please specify the ledger amount';
-                  if (double.tryParse(val) == null || double.parse(val) <= 0) return 'Please enter a valid amount';
+                validator: (value) => value == null || value.isEmpty ? 'कृपया नाव टाका' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // 📞 फोन नंबर इनपुट
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'मोबाईल नंबर',
+                  prefixIcon: const Icon(Icons.phone_outlined),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'कृपया मोबाईल नंबर टाका';
+                  if (value.length < 10) return 'योग्य मोबाईल नंबर टाका';
                   return null;
                 },
               ),
               const SizedBox(height: 16),
 
-              // Optional Notes / Item Bills
+              // 💰 सुरुवातीची बाकी (Optional)
               TextFormField(
-                controller: _notesController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Optional Remarks / Notes',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.notes),
+                controller: _amountController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'सुरुवातीची बाकी रक्कम (असेल तर)',
+                  prefixIcon: const Icon(Icons.currency_rupee),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  hintText: '0',
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(  ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Discard'),
-                    ),
+              // 🚀 सबमिट बटन
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _submitData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        
-                        backgroundColor: widget.isDebitMode ? Colors.red : Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: _submitTransaction,
-                      child: const Text('Save Entry', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('सुरक्षित सेव्ह करा', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _amountController.dispose();
+    super.dispose();
   }
 }

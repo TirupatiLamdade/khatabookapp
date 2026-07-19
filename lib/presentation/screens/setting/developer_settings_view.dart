@@ -1,70 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
-import '../../../core/security/audit_logger.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class DeveloperSettingsView extends StatelessWidget {
-  const DeveloperSettingsView({super.key});
+  const DeveloperSettingsView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // Look up the theme color scheme from context
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Developer & Diagnostics Mode')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            // FIXED: Using colorScheme.errorContainer instead of Colors.redContainer
-            color: colorScheme.errorContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              // Dynamic text color matching the theme's error container contrast requirements
-              child: Text(
-                'WARNING: Internal database testing instruments active. Modifying entries may cause sync failure.',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onErrorContainer,
+      appBar: AppBar(
+        title: const Text('डेव्हलपर सेटिंग्स'),
+        backgroundColor: Colors.blue.shade800,
+        foregroundColor: Colors.white,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '⚠️ चेतावणी: हे पर्याय फक्त टेस्टिंगसाठी आहेत. येथील बदलांमुळे लोकल कॅश डेटा डिलीट होऊ शकतो.',
+              style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 24),
+            
+            // 🔄 ऑप्शन १: Hive कॅश साफ करणे
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.storage, color: Colors.red),
+                title: const Text('लोकल Hive कॅश क्लिअर करा'),
+                subtitle: const Text('ॲपमधील साठवलेला तात्पुरता डेटा साफ करा'),
+                trailing: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white),
+                  onPressed: () async {
+                    var box = Hive.box('settings_box');
+                    await box.clear();
+                    
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('लोकल कॅश यशस्वीरित्या साफ केली!')),
+                      );
+                    }
+                  },
+                  child: const Text('Clear'),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.storage),
-            title: const Text('Inspect Hive Local Allocation'),
-            subtitle: Text('Customers cached: ${Hive.box('customers_box').length} entries'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
-          ),
-          ListTile(
-            leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('Trigger Synthetic Local Exception'),
-            subtitle: const Text('Tests Crashlytics logging pipeline natively'),
-            onTap: () {
-              AuditLogger.logEvent(
-                action: 'DIAGNOSTIC_CRASH_TEST',
-                userId: 'dev_admin',
-                details: 'User initiated simulated crash sequence.',
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Simulated Diagnostic Event Dispatched.')),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.cloud_sync_outlined),
-            title: const Text('Purge Sync Queue Queue'),
-            subtitle: Text('Pending cache objects: ${Hive.box('pending_sync_queue').length} items'),
-            onTap: () async {
-              await Hive.box('pending_sync_queue').clear();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Synchronization Buffer Cleared.')),
-              );
-            },
-          ),
-        ],
+            const SizedBox(height: 12),
+
+            // 📋 ऑप्शन २: सिस्टीम इन्फो (Diagnostic)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.info_outline, color: Colors.blue),
+                title: const Text('ॲप व्हर्जन आणि डायग्नोस्टिक्स'),
+                subtitle: const Text('v1.0.0 (Production Engine) • Firebase Sync: Active'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
