@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/providers/global_provider_hub.dart';
 import '../customer/ledger_screen.dart';
@@ -34,6 +35,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  Future<void> _performLogout(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
+    if (context.mounted) {
+      context.go('/splash');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -42,8 +50,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (currentUser == null) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0B0F19),
-        body: Center(child: Text('Unauthorized Session Request.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'Unauthorized Session Request.', 
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)
+          ),
+        ),
       );
     }
 
@@ -51,22 +64,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isDark = currentTheme == ThemeMode.dark || 
                    (currentTheme == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
 
+    // 🎨 Ultra-Clean Professional Palette
+    final bgColor = isDark ? Colors.black : const Color(0xFFF8FAFC);
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final cardBgColor = isDark ? const Color(0xFF0F172A) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC),
+      backgroundColor: bgColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: isDark ? const Color(0xFF111827) : Colors.white,
+        backgroundColor: cardBgColor,
         elevation: 0,
         title: Row(
           children: [
-            const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF4F46E5), size: 24),
-            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF38BDF8).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF38BDF8), size: 24),
+            ),
+            const SizedBox(width: 14),
             Text(
               'Smart Ledger System', 
               style: TextStyle(
-                fontWeight:FontWeight.bold, 
+                fontWeight: FontWeight.w900, 
                 fontSize: 18, 
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                color: textColor,
                 letterSpacing: 0.5
               )
             ),
@@ -76,30 +102,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           IconButton(
             icon: Icon(
               _showArchived ? Icons.archive_rounded : Icons.archive_outlined, 
-              color: _showArchived ? const Color(0xFF4F46E5) : Colors.grey
+              color: _showArchived ? const Color(0xFF38BDF8) : Colors.grey
             ),
             onPressed: () => setState(() => _showArchived = !_showArchived),
             tooltip: 'View Archived Node Accounts',
           ),
+          const SizedBox(width: 8),
         ],
-        shape: Border(bottom: BorderSide(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0), width: 1)),
+        shape: Border(bottom: BorderSide(color: borderColor, width: 1)),
       ),
       body: isDesktop 
           ? Row(
               children: [
-                _buildWebVerticalSlider(isDark),
+                _buildWebVerticalSlider(isDark, textColor, cardBgColor, borderColor),
                 Expanded(
-                  child: _buildMainContentPanel(currentUser.uid, isDesktop, isDark),
+                  child: _buildMainContentPanel(currentUser.uid, isDesktop, isDark, textColor, cardBgColor, borderColor),
                 ),
               ],
             )
-          : _buildMainContentPanel(currentUser.uid, isDesktop, isDark),
+          : _buildMainContentPanel(currentUser.uid, isDesktop, isDark, textColor, cardBgColor, borderColor),
       floatingActionButton: _currentIndex == 0
           ? FloatingActionButton.extended(
-              onPressed: () => _openAddNewCustomerModal(context, currentUser.uid, isDark),
-              backgroundColor: const Color(0xFF4F46E5),
+              onPressed: () => _openAddNewCustomerModal(context, currentUser.uid, isDark, textColor, cardBgColor),
+              backgroundColor: const Color(0xFF10B981),
+              elevation: 4,
               icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
-              label: const Text('Add New Customer', style: TextStyle(color: Colors.white, fontWeight:FontWeight.bold)),
+              label: const Text('Add New Customer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.3)),
             )
           : null,
       bottomNavigationBar: isDesktop 
@@ -107,10 +135,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           : BottomNavigationBar(
               currentIndex: _currentIndex,
               onTap: (index) => setState(() => _currentIndex = index),
-              backgroundColor: isDark ? const Color(0xFF111827) : Colors.white,
-              selectedItemColor: const Color(0xFF4F46E5),
-              unselectedItemColor: isDark ? const Color(0xFF4B5563) : const Color(0xFF94A3B8),
-              selectedLabelStyle: const TextStyle(fontWeight:FontWeight.bold),
+              backgroundColor: cardBgColor,
+              selectedItemColor: const Color(0xFF38BDF8),
+              unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w900),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
               items: const [
                 BottomNavigationBarItem(icon: Icon(Icons.menu_book_rounded), label: 'Ledger Book'),
                 BottomNavigationBarItem(icon: Icon(Icons.history_toggle_off_rounded), label: 'History Flow'),
@@ -120,12 +149,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildWebVerticalSlider(bool isDark) {
+  // 🖥️ PROFESSIONAL WEB SIDEBAR NAVIGATION
+  Widget _buildWebVerticalSlider(bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     return Container(
       width: 280,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111827) : Colors.white,
-        border: Border(right: BorderSide(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0), width: 1.5)),
+        color: cardBgColor,
+        border: Border(right: BorderSide(color: borderColor, width: 1.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -135,16 +165,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Text(
               'WORKSPACE NAVIGATION', 
-              style: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade600, fontWeight:FontWeight.bold, fontSize: 11, letterSpacing: 0.8)
+              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)
             ),
           ),
           const SizedBox(height: 16),
-          _buildSliderButton(index: 0, label: 'Ledger Book', icon: Icons.menu_book_rounded),
-          _buildSliderButton(index: 1, label: 'History Flow', icon: Icons.history_toggle_off_rounded),
-          _buildSliderButton(index: 2, label: 'Control Desk', icon: Icons.settings_suggest_rounded),
+          _buildSliderButton(index: 0, label: 'Ledger Book', icon: Icons.menu_book_rounded, isDark: isDark),
+          _buildSliderButton(index: 1, label: 'History Flow', icon: Icons.history_toggle_off_rounded, isDark: isDark),
+          _buildSliderButton(index: 2, label: 'Control Desk', icon: Icons.settings_suggest_rounded, isDark: isDark),
           const Spacer(),
           if (_currentIndex == 0) ...[
-            const Divider(color: Colors.white12, height: 1),
+            Divider(color: borderColor, height: 1),
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -152,68 +182,96 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   Text(
                     'CUSTOMER FILTERS', 
-                    style: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade600, fontWeight:FontWeight.bold, fontSize: 11, letterSpacing: 0.8)
+                    style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)
                   ),
                   const SizedBox(height: 12),
-                  _buildWebFilterTile('all', 'All Accounts', isDark),
-                  _buildWebFilterTile('500', '₹500+ Credit Limit', isDark),
-                  _buildWebFilterTile('1000', '₹1000+ Credit Limit', isDark),
+                  _buildWebFilterTile('all', 'All Accounts', isDark, textColor),
+                  _buildWebFilterTile('500', '₹500+ Credit Limit', isDark, textColor),
+                  _buildWebFilterTile('1000', '₹1000+ Credit Limit', isDark, textColor),
                 ],
               ),
             )
-          ]
+          ],
+          const SizedBox(height: 12),
         ],
       ),
     );
   }
 
-  // 🌟 ULTRA-BOLD PILL SHAPED DYNAMIC ACTION TRACKER
-  Widget _buildSliderButton({required int index, required String label, required IconData icon}) {
+  // 🎯 HIGHLY PROFESSIONAL DYNAMIC BUTTON WITH GRADIENT & SHADOW
+  Widget _buildSliderButton({required int index, required String label, required IconData icon, required bool isDark}) {
     bool isSelected = _currentIndex == index;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ListTile(
-        onTap: () => setState(() => _currentIndex = index),
-        dense: false,
-        selected: isSelected,
-        selectedTileColor: const Color(0xFF4F46E5), 
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), 
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-        leading: Icon(
-          icon, 
-          color: isSelected ? Colors.white : const Color(0xFF64748B), 
-          size: 22
-        ),
-        title: Text(
-          label, 
-          style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF334155), 
-            fontWeight:FontWeight.bold, 
-            fontSize: 14,
-            letterSpacing: 0.3,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _currentIndex = index),
+          borderRadius: BorderRadius.circular(14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: isSelected 
+                  ? const LinearGradient(colors: [Color(0xFF0066CC), Color(0xFF0284C7)]) 
+                  : null,
+              color: isSelected ? null : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: isSelected ? [
+                BoxShadow(
+                  color: const Color(0xFF0066CC).withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ] : [],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon, 
+                  color: isSelected ? Colors.white : (isDark ? Colors.grey.shade400 : Colors.grey.shade600), 
+                  size: 22
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    label, 
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF0F172A)), 
+                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold, 
+                      fontSize: 14,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildWebFilterTile(String filterType, String label, bool isDark) {
+  // 🎯 MODERN FILTER TILE BUTTON
+  Widget _buildWebFilterTile(String filterType, String label, bool isDark, Color textColor) {
     bool isSelected = _selectedFilter == filterType;
     return InkWell(
       onTap: () => setState(() => _selectedFilter = filterType),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         margin: const EdgeInsets.only(bottom: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          gradient: isSelected ? const LinearGradient(colors: [Color(0xFF0066CC), Color(0xFF0284C7)]) : null,
+          color: isSelected ? null : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF0F172A)),
-            fontWeight:FontWeight.bold,
+            color: isSelected ? Colors.white : textColor,
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
             fontSize: 13
           ),
         ),
@@ -221,34 +279,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildMainContentPanel(String operatorUid, bool isDesktop, bool isDark) {
+  Widget _buildMainContentPanel(String operatorUid, bool isDesktop, bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     return IndexedStack(
       index: _currentIndex,
       children: [
-        _buildCustomerTab(operatorUid, isDesktop, isDark),
-        _buildTransactionHistoryView(operatorUid, isDark),
-        _buildSettingsControlPanel(isDark),
+        _buildCustomerTab(operatorUid, isDesktop, isDark, textColor, cardBgColor, borderColor),
+        _buildTransactionHistoryView(operatorUid, isDark, textColor, cardBgColor, borderColor),
+        _buildSettingsControlPanel(isDark, textColor, cardBgColor, borderColor),
       ],
     );
   }
 
-  Widget _buildCustomerTab(String operatorUid, bool isDesktop, bool isDark) {
+  Widget _buildCustomerTab(String operatorUid, bool isDesktop, bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(16),
-          color: isDark ? const Color(0xFF111827) : Colors.white,
+          color: cardBgColor,
           child: Column(
             children: [
               TextField(
                 controller: _searchController,
-                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.bold),
+                style: TextStyle(color: textColor, fontWeight: FontWeight.w900),
                 decoration: InputDecoration(
-                  hintText: 'Search by name, phone, or balance amount threshold (e.g. 10000)...',
-                  hintStyle: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                  prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF4F46E5)),
+                  hintText: 'Search by name, phone, or balance amount threshold...',
+                  hintStyle: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontWeight: FontWeight.bold),
+                  prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF38BDF8)),
                   filled: true,
-                  fillColor: isDark ? const Color(0xFF0B0F19) : const Color(0xFFF1F5F9),
+                  fillColor: isDark ? Colors.black : const Color(0xFFF1F5F9),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
                 onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
@@ -257,11 +315,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _buildFilterChip('all', 'All Accounts', isDark),
+                    _buildFilterChip('all', 'All Accounts', isDark, textColor),
                     const SizedBox(width: 8),
-                    _buildFilterChip('500', '₹500+ Credit', isDark),
+                    _buildFilterChip('500', '₹500+ Credit', isDark, textColor),
                     const SizedBox(width: 8),
-                    _buildFilterChip('1000', '₹1000+ Credit', isDark),
+                    _buildFilterChip('1000', '₹1000+ Credit', isDark, textColor),
                   ],
                 )
               ]
@@ -277,13 +335,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)));
+                return const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)));
               }
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                 return Center(
                   child: Text(
                     'No active merchant nodes deployed.',
-                    style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF0F172A), fontWeight:FontWeight.bold)
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w900)
                   )
                 );
               }
@@ -314,12 +372,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 return Center(
                   child: Text(
                     'No matching accounts found for the current query framework.',
-                    style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF0F172A), fontWeight:FontWeight.bold)
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w900)
                   )
                 );
               }
 
-              return isDesktop ? _buildGridSystem(docs, isDark) : _buildStackedList(docs, isDark);
+              return isDesktop 
+                  ? _buildGridSystem(docs, isDark, textColor, cardBgColor, borderColor) 
+                  : _buildStackedList(docs, isDark, textColor, cardBgColor, borderColor);
             },
           ),
         ),
@@ -327,26 +387,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildGridSystem(List<QueryDocumentSnapshot> docs, bool isDark) {
+  Widget _buildGridSystem(List<QueryDocumentSnapshot> docs, bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     return GridView.builder(
       padding: const EdgeInsets.all(24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2, crossAxisSpacing: 20, mainAxisSpacing: 16, childAspectRatio: 3.2,
       ),
       itemCount: docs.length,
-      itemBuilder: (context, index) => _buildCustomerRowCard(docs[index], isDark),
+      itemBuilder: (context, index) => _buildCustomerRowCard(docs[index], isDark, textColor, cardBgColor, borderColor),
     );
   }
 
-  Widget _buildStackedList(List<QueryDocumentSnapshot> docs, bool isDark) {
+  Widget _buildStackedList(List<QueryDocumentSnapshot> docs, bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: docs.length,
-      itemBuilder: (context, index) => _buildCustomerRowCard(docs[index], isDark),
+      itemBuilder: (context, index) => _buildCustomerRowCard(docs[index], isDark, textColor, cardBgColor, borderColor),
     );
   }
 
-  Widget _buildCustomerRowCard(QueryDocumentSnapshot doc, bool isDark) {
+  Widget _buildCustomerRowCard(QueryDocumentSnapshot doc, bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     final data = doc.data() as Map<String, dynamic>;
     final double balance = double.tryParse(data['balance']?.toString() ?? '0.0') ?? 0.0;
     final String customerId = doc.id;
@@ -357,9 +417,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111827) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0), width: 1.5),
+        color: cardBgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1.5),
       ),
       child: ListTile(
         onTap: () {
@@ -377,13 +437,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         },
         title: Text(
           data['name'] ?? 'Anonymous Entity', 
-          style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight:FontWeight.bold)
+          style: TextStyle(color: textColor, fontWeight: FontWeight.w900)
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('+91 ${data['phone'] ?? ""}', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
-            Text(data['address'] ?? "", style: TextStyle(color: Colors.grey.shade500, fontSize: 11, overflow: TextOverflow.ellipsis)),
+            Text('+91 ${data['phone'] ?? ""}', style: TextStyle(color: isDark ? Colors.grey.shade300 : Colors.grey.shade700, fontWeight: FontWeight.bold)),
+            Text(data['address'] ?? "", style: TextStyle(color: Colors.grey.shade500, fontSize: 11, overflow: TextOverflow.ellipsis, fontWeight: FontWeight.w600)),
           ],
         ),
         isThreeLine: true,
@@ -420,7 +480,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildTransactionHistoryView(String operatorUid, bool isDark) {
+  Widget _buildTransactionHistoryView(String operatorUid, bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('transactions')
@@ -431,7 +491,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return Center(
             child: Text(
               'No verified transaction logs archived yet.',
-              style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF0F172A), fontWeight:FontWeight.bold)
+              style: TextStyle(color: textColor, fontWeight: FontWeight.w900)
             )
           );
         }
@@ -442,24 +502,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final tx = snapshot.data!.docs[index].data() as Map<String, dynamic>;
             final amt = double.tryParse(tx['totalPrice']?.toString() ?? '0.0') ?? 0.0;
             return Card(
-              color: isDark ? const Color(0xFF111827) : Colors.white,
+              color: cardBgColor,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0))
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: borderColor)
               ),
               child: ListTile(
                 title: Text(
                   tx['productName'] ?? 'Item Record Entry', 
-                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight:FontWeight.bold)
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w900)
                 ),
                 subtitle: Text(
                   'Merchant: ${tx['customerName']} | Qty: ${tx['quantity']}\nCommitment Note: ${tx['commitMessage'] ?? 'None'}',
-                  style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.grey, fontSize: 12)
+                  style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700, fontSize: 12)
                 ),
                 isThreeLine: true,
                 trailing: Text(
                   '₹${amt.toStringAsFixed(2)}', 
-                  style: TextStyle(color: tx['type'] == 'credit' ? const Color(0xFFEF4444) : const Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 14)
+                  style: TextStyle(color: tx['type'] == 'credit' ? const Color(0xFFEF4444) : const Color(0xFF10B981), fontWeight: FontWeight.w900, fontSize: 14)
                 ),
               ),
             );
@@ -469,52 +529,109 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSettingsControlPanel(bool isDark) {
+  // ⚙️ CONTROL DESK WITH EXCLUSIVE HIGH-END LOGOUT CARD
+  Widget _buildSettingsControlPanel(bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     final currentTheme = ref.watch(themeModeProvider);
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Text('SYSTEM THEME CONFIGURATION CANVAS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.8, fontSize: 12)),
+        Text(
+          'SYSTEM THEME CONFIGURATION CANVAS', 
+          style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700, letterSpacing: 1.0, fontSize: 11)
+        ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF111827) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0), width: 1.5)
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor, width: 1.5)
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<ThemeMode>(
               value: currentTheme,
-              dropdownColor: isDark ? const Color(0xFF111827) : Colors.white,
-              icon: const Icon(Icons.palette_rounded, color: Color(0xFF4F46E5)),
+              dropdownColor: cardBgColor,
+              icon: const Icon(Icons.palette_rounded, color: Color(0xFF38BDF8)),
               isExpanded: true,
-              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight:FontWeight.bold, fontSize: 14),
+              style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 14),
               onChanged: (ThemeMode? val) {
                 if (val != null) {
                   ref.read(themeModeProvider.notifier).state = val;
                 }
               },
-              items: const [
-                DropdownMenuItem(value: ThemeMode.dark, child: Text('Activate Dark Slate System Profile')),
-                DropdownMenuItem(value: ThemeMode.light, child: Text('Activate Light Clean System Profile')),
-                DropdownMenuItem(value: ThemeMode.system, child: Text('Synchronize Local Operating System Theme')),
+              items: [
+                DropdownMenuItem(value: ThemeMode.dark, child: Text('Activate Dark Slate System Profile', style: TextStyle(color: textColor, fontWeight: FontWeight.w900))),
+                DropdownMenuItem(value: ThemeMode.light, child: Text('Activate Light Clean System Profile', style: TextStyle(color: textColor, fontWeight: FontWeight.w900))),
+                DropdownMenuItem(value: ThemeMode.system, child: Text('Synchronize Local Operating System Theme', style: TextStyle(color: textColor, fontWeight: FontWeight.w900))),
               ],
             ),
+          ),
+        ),
+        const SizedBox(height: 36),
+
+        Text(
+          'ACCOUNT OPERATIONAL ACTIONS', 
+          style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700, letterSpacing: 1.0, fontSize: 11)
+        ),
+        const SizedBox(height: 16),
+
+        // 🔴 EXCLUSIVE LOGOUT CARD (THE ONLY LOGOUT BUTTON IN THE APP)
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.5),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Logout Session', 
+                      style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 16)
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Terminates current session and redirects to initial splash.', 
+                      style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.bold)
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              ElevatedButton.icon(
+                onPressed: () => _performLogout(context),
+                icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+                label: const Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  elevation: 2,
+                  shadowColor: const Color(0xFFEF4444).withOpacity(0.4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildFilterChip(String filterType, String label, bool isDark) {
+  Widget _buildFilterChip(String filterType, String label, bool isDark, Color textColor) {
     bool isSelected = _selectedFilter == filterType;
     return ChoiceChip(
-      label: Text(label, style: TextStyle(fontWeight:FontWeight.bold, color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF0F172A)))),
+      label: Text(
+        label, 
+        style: TextStyle(fontWeight: FontWeight.w900, color: isSelected ? Colors.white : textColor)
+      ),
       selected: isSelected,
       onSelected: (val) => setState(() => _selectedFilter = filterType),
-      selectedColor: const Color(0xFF4F46E5),
-      backgroundColor: isDark ? const Color(0xFF0B0F19) : const Color(0xFFF1F5F9),
+      selectedColor: const Color(0xFF0066CC),
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF1F5F9),
       showCheckmark: false,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8), 
@@ -523,8 +640,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _openAddNewCustomerModal(BuildContext context, String operatorUid, bool isDark) {
-    final _formModalKey = GlobalKey<FormState>();
+  void _openAddNewCustomerModal(BuildContext context, String operatorUid, bool isDark, Color textColor, Color cardBgColor) {
+    final formModalKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final addressController = TextEditingController();
@@ -532,33 +649,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF111827) : Colors.white,
-        title: Text('Register Enterprise Node Account', style: TextStyle(fontWeight:FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 16)),
+        backgroundColor: cardBgColor,
+        title: Text('Register Enterprise Node Account', style: TextStyle(fontWeight: FontWeight.w900, color: textColor, fontSize: 16)),
         content: Form(
-          key: _formModalKey,
+          key: formModalKey,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
                   controller: nameController, 
-                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.bold),
-                  decoration: const InputDecoration(labelText: 'Customer Legal Full Name *', labelStyle: TextStyle(fontSize: 12)),
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w900),
+                  decoration: InputDecoration(labelText: 'Customer Legal Full Name *', labelStyle: TextStyle(fontSize: 12, color: textColor)),
                   validator: (v) => (v == null || v.isEmpty) ? 'Corporate name parameter mandatory.' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: phoneController, 
-                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.bold),
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w900),
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Mobile Communication Gateway *', prefixText: '+91 ', labelStyle: TextStyle(fontSize: 12)),
+                  decoration: InputDecoration(labelText: 'Mobile Communication Gateway *', prefixText: '+91 ', labelStyle: TextStyle(fontSize: 12, color: textColor)),
                   validator: (v) => (v == null || v.isEmpty || v.length != 10) ? 'Provide verified 10-digit primary channel.' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: addressController, 
-                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.bold),
-                  decoration: const InputDecoration(labelText: 'Physical Warehousing/Hub Address *', labelStyle: TextStyle(fontSize: 12)),
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w900),
+                  decoration: InputDecoration(labelText: 'Physical Warehousing/Hub Address *', labelStyle: TextStyle(fontSize: 12, color: textColor)),
                   validator: (v) => (v == null || v.isEmpty) ? 'Logistics physical location entry mandatory.' : null,
                 ),
               ],
@@ -566,11 +683,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abort Session', style: TextStyle(fontWeight: FontWeight.bold))),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Abort Session', style: TextStyle(fontWeight: FontWeight.w900, color: textColor))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
             onPressed: () async {
-              if (_formModalKey.currentState!.validate()) {
+              if (formModalKey.currentState!.validate()) {
                 await FirebaseFirestore.instance.collection('customers').add({
                   'operatorUid': operatorUid,
                   'name': nameController.text.trim(),
@@ -582,7 +699,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Navigator.pop(context);
               }
             },
-            child: const Text('Commit Entry', style: TextStyle(color: Colors.white, fontWeight:FontWeight.bold)),
+            child: const Text('Commit Entry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
           )
         ],
       ),
