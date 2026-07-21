@@ -61,7 +61,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
       final User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         setState(() {
-          _emailController.text = user.email ?? 'lamdadetirupati89@gmail.com';
+          _emailController.text = user.email ?? '';
           _phoneController.text = user.phoneNumber ?? '';
         });
 
@@ -89,7 +89,6 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
         }
       } else {
         setState(() {
-          _emailController.text = 'lamdadetirupati89@gmail.com';
           _currentUsername = 'Demo Operator';
         });
       }
@@ -114,6 +113,8 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
         'businessCategory': _selectedCategory,
         'gstin': _gstinController.text.trim().toUpperCase(),
         'shopAddress': _addressController.text.trim(),
+        'firstLogin': false, // 🚀 Profile Setup 완료: Mark firstLogin as false
+        'updatedAt': FieldValue.serverTimestamp(),
         'lastUpdated': FieldValue.serverTimestamp(),
       };
 
@@ -123,7 +124,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
       
       _showTopNotification('Business Profile Initialized & Saved Successfully.');
       
-      // ➡️ 🚀 यहाँ हम डिलीट/रीसेट स्टैक मैकेनिज्म (context.go) का इस्तेमाल कर रहे हैं ताकि यूजर वापस पीछे न आ सके
+      // ➡️ 🚀 Stack Clear & Navigate to Home Screen
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (mounted) {
           context.go('/home'); 
@@ -132,7 +133,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
     } catch (e) {
       _showTopNotification('Failed to synchronize cloud database ledger.', isError: true);
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -182,18 +183,18 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
     final isTablet = size.width > 640 && size.width <= 1024;
     final layoutWidth = isDesktop ? 850.0 : (isTablet ? size.width * 0.90 : size.width);
 
-    // 🛠️ FIX: यहाँ PopScope का उपयोग करके बैक बटन/जेस्चर को पूरी तरह से डिसेबल कर दिया है
+    // 🛠️ FIX: PopScope का उपयोग करके बैक नेविगेशन को लॉक रखा गया है
     return PopScope(
-      canPop: false, // यूजर बैक नहीं जा सकता
+      canPop: false,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A), // Keep original Background Color exactly
+        backgroundColor: const Color(0xFF0F172A),
         appBar: AppBar(
           title: const Text(
             'Shop Profile Setup', 
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18, letterSpacing: 0.5)
           ),
-          automaticallyImplyLeading: false, // 🛠️ FIX: AppBar से भी डिफ़ॉल्ट बैक एरो बटन हटा दिया है
-          backgroundColor: const Color(0xFF1E293B), // Keep original AppBar Background Color exactly
+          automaticallyImplyLeading: false,
+          backgroundColor: const Color(0xFF1E293B),
           elevation: 0,
           centerTitle: true,
         ),
@@ -308,7 +309,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
     );
   }
 
-  // 🖥️ 1. WEB / DESKTOP LAYOUT (2 Column Side-by-Side Grid Layout Architecture)
+  // 🖥️ 1. WEB / DESKTOP LAYOUT
   Widget _buildWebDesktopLayout() {
     return Column(
       children: [
@@ -413,7 +414,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
     );
   }
 
-  // 📱 2. MOBILE / TABLET LAYOUT (Single Column Premium Stacked Form Architecture)
+  // 📱 2. MOBILE / TABLET LAYOUT
   Widget _buildMobileTabletLayout() {
     return Column(
       children: [

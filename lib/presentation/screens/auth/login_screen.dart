@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -32,8 +33,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   bool _isForgotPasswordMode = false;
   bool _isResetPhoneVerified = false;
   bool _isNewPhoneUser = false;
+  bool _isWaitingEmailVerification = false;
   bool _obscurePassword = true; 
   
+  // Dropdown items for Forgot Password
+  List<String> _linkedUsernamesList = [];
+  String? _selectedResetUsername;
+
   // Loading Flags
   bool _isFormLoading = false;
   bool _isGoogleLoading = false;
@@ -42,16 +48,15 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   bool _showOtpVerificationField = false;
   ConfirmationResult? _webConfirmationResult;
   
-  // ⏱️ Timer Variables for 1-Min OTP Expiry
   Timer? _otpTimer;
   int _otpSecondsRemaining = 60;
   bool _isOtpExpired = false;
 
-  // 🎨 Animation Controllers
+  Timer? _emailVerificationTimer;
+
   late AnimationController _ambientController;
   late AnimationController _pulseController;
   
-  // 📊 Live Desktop Mock Activity Feed
   final List<String> _liveActivityFeed = [
     "Rajesh Sharma added ₹500 credit",
     "Suresh Patil paid ₹1,200 balance",
@@ -75,7 +80,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
-    // Live Feed Cycle for Left Desktop Panel
     _feedTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted) {
         setState(() {
@@ -89,6 +93,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   void dispose() {
     _otpTimer?.cancel();
     _feedTimer?.cancel();
+    _emailVerificationTimer?.cancel();
     _ambientController.dispose();
     _pulseController.dispose();
     _identityController.dispose();
@@ -103,7 +108,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     super.dispose();
   }
 
-  // ⏱️ Starts 60-Second OTP Countdown Timer
   void _startOtpCountdownTimer() {
     _otpTimer?.cancel();
     setState(() {
@@ -117,9 +121,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       } else {
         _otpTimer?.cancel();
         setState(() => _isOtpExpired = true);
-        _showTopNotification(context, 'OTP expired! Auto-reloading gateway...', isError: true);
+        _showTopNotification(context, 'OTP expired! Reloading...', isError: true);
         
-        // Auto Reload screen after expiration
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) _resetToDefaultCredentialsMode();
         });
@@ -127,7 +130,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     });
   }
 
-  // 🔔 Universal Top Overlay Notification Engine
   void _showTopNotification(BuildContext context, String message, {bool isError = false}) {
     final overlay = Overlay.of(context);
     final overlayEntry = OverlayEntry(
@@ -166,7 +168,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       color: Colors.white, 
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
-                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
@@ -180,7 +181,37 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     Future.delayed(const Duration(seconds: 4), () => overlayEntry.remove());
   }
 
-  // 👥 INSTAGRAM-STYLE MULTI-ACCOUNT SELECTOR BOTTOM SHEET
+  Future<void> _openEmailApp() async {
+    final Uri emailLaunchUri = Uri(scheme: 'mailto');
+    try {
+      if (await canLaunchUrl(emailLaunchUri)) {
+        await launchUrl(emailLaunchUri);
+      } else {
+        _showTopNotification(context, 'Please open your inbox manually.', isError: true);
+      }
+    } catch (e) {
+      _showTopNotification(context, 'Could not launch email app.', isError: true);
+    }
+  }
+
+  // 🔀 Processing Navigation Logic
+  Future<void> _processUserPostLogin(String uid, String email) async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    bool isFirstTime = true;
+
+    if (doc.exists && doc.data()!.containsKey('isFirstTime')) {
+      isFirstTime = doc.data()!['isFirstTime'] ?? false;
+    }
+
+    if (mounted) {
+      context.go('/processing', extra: {
+        'next': isFirstTime ? '/shop-setup' : '/home',
+        'email': email,
+      });
+    }
+  }
+
+  // 👥 Multi-Account Selection Sheet
   void _showMultiAccountSelector(List<QueryDocumentSnapshot<Map<String, dynamic>>> accounts) {
     showModalBottomSheet(
       context: context,
@@ -202,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               ),
               const SizedBox(height: 6),
               const Text(
-                'Multiple accounts are linked with this phone number. Choose one to log in or create a new one:',
+                'Select an account to proceed:',
                 style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
               ),
               const SizedBox(height: 16),
@@ -212,6 +243,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 final data = doc.data();
                 final username = data['username'] ?? 'User';
                 final email = data['email'] ?? '';
+                final uid = data['uid'] ?? doc.id;
+
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(vertical: 4),
                   leading: const CircleAvatar(
@@ -229,11 +262,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 16),
                   onTap: () {
                     Navigator.pop(context);
-                    setState(() {
-                      _isPhoneAuthMode = false;
-                      _identityController.text = username;
-                    });
-                    _showTopNotification(context, 'Account selected: $username. Enter your password.');
+                    _showTopNotification(context, 'Logging in as $username...');
+                    _processUserPostLogin(uid, email);
                   },
                 );
               }).toList(),
@@ -242,7 +272,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               Divider(color: Colors.white.withOpacity(0.1)),
               const SizedBox(height: 8),
 
-              // 🆕 "+ Create New Account" Option
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
                 leading: const CircleAvatar(
@@ -261,9 +290,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 onTap: () {
                   Navigator.pop(context);
                   setState(() {
+                    _isPhoneAuthMode = true;
                     _isNewPhoneUser = true;
                   });
-                  _showTopNotification(context, 'Enter Email, Username and Password to register new account.');
+                  _showTopNotification(context, 'Fill form below to create account.');
                 },
               ),
             ],
@@ -273,7 +303,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
-  // 1️⃣ SIGNUP ROUTINE
+  // 1️⃣ Registration Logic
   Future<void> _executeSecureSignUp() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -282,16 +312,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
     try {
       final usernameInput = _usernameController.text.trim().toLowerCase();
-      final checkUsername = await db.collection('users').where('username', isEqualTo: usernameInput).get();
+      final emailInput = _emailController.text.trim().toLowerCase();
 
+      final checkUsername = await db.collection('users').where('username', isEqualTo: usernameInput).get();
       if (checkUsername.docs.isNotEmpty) {
-        _showTopNotification(context, 'Username is already taken. Please choose another.', isError: true);
+        _showTopNotification(context, 'Username already taken.', isError: true);
         setState(() => _isFormLoading = false);
         return;
       }
 
       UserCredential credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim().toLowerCase(),
+        email: emailInput,
         password: _passwordController.text.trim(),
       );
 
@@ -301,22 +332,42 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         'uid': credential.user!.uid,
         'fullName': _fullNameController.text.trim(),
         'username': usernameInput,
-        'email': _emailController.text.trim().toLowerCase(),
+        'email': emailInput,
         'phone': _phoneController.text.trim(),
-        'authProvider': 'credentials',
+        'isFirstTime': true,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      _showTopNotification(context, 'Registration successful! Verification email sent.');
-      _resetToDefaultCredentialsMode();
+      _showTopNotification(context, 'Verification link sent to email!');
+
+      setState(() {
+        _isWaitingEmailVerification = true;
+        _isFormLoading = false;
+      });
+
+      _startEmailVerificationCheck(credential.user!, credential.user!.uid, emailInput);
+
     } on FirebaseAuthException catch (e) {
       _showTopNotification(context, e.message ?? 'Registration failed.', isError: true);
-    } finally {
       setState(() => _isFormLoading = false);
     }
   }
 
-  // 2️⃣ UNIFIED LOGIN LOGIC
+  void _startEmailVerificationCheck(User user, String uid, String email) {
+    _emailVerificationTimer?.cancel();
+    _emailVerificationTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      await user.reload();
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null && currentUser.emailVerified) {
+        timer.cancel();
+        _showTopNotification(context, 'Email verified! Redirecting...');
+        _processUserPostLogin(uid, email);
+      }
+    });
+  }
+
+  // 2️⃣ Standard Credentials Login
   Future<void> _executeUnifiedLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -347,11 +398,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       }
 
       if (resolvedEmail == null || resolvedEmail.isEmpty) {
-        _showTopNotification(context, 'Invalid credentials entered. Auto-reloading fields...', isError: true);
-        
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) _resetToDefaultCredentialsMode();
-        });
+        _showTopNotification(context, 'Invalid user details.', isError: true);
+        setState(() => _isFormLoading = false);
         return;
       }
 
@@ -364,67 +412,26 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       User? currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser != null && !currentUser.emailVerified) {
-        _showTopNotification(context, 'Please verify your email address before log in.', isError: true);
+        _showTopNotification(context, 'Please verify email before logging in.', isError: true);
         await FirebaseAuth.instance.signOut();
         setState(() => _isFormLoading = false);
         return;
       }
 
-      _showTopNotification(context, 'Login verified successfully!');
-      context.go('/processing', extra: {'email': resolvedEmail});
+      _showTopNotification(context, 'Login successful!');
+      _processUserPostLogin(currentUser!.uid, resolvedEmail);
+
     } on FirebaseAuthException catch (e) {
-      _showTopNotification(context, 'Invalid password or user record. Auto-reloading...', isError: true);
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) _resetToDefaultCredentialsMode();
-      });
+      _showTopNotification(context, 'Invalid password or user record.', isError: true);
     } finally {
       setState(() => _isFormLoading = false);
     }
   }
 
-  // 3️⃣ GOOGLE AUTHENTICATION
-  Future<void> _executeGoogleAuthentication() async {
-    setState(() => _isGoogleLoading = true);
-    final db = FirebaseFirestore.instance;
-
-    try {
-      GoogleAuthProvider googleProvider = GoogleAuthProvider();
-      googleProvider.addScope('email');
-      googleProvider.addScope('profile');
-      
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithPopup(googleProvider);
-      User? user = userCredential.user;
-
-      if (user != null) {
-        final docRef = db.collection('users').doc(user.uid);
-        final docSnapshot = await docRef.get();
-
-        if (!docSnapshot.exists) {
-          await docRef.set({
-            'uid': user.uid,
-            'fullName': user.displayName ?? 'Google Identity',
-            'username': user.email!.split('@')[0].toLowerCase(),
-            'email': user.email!.toLowerCase(),
-            'phone': user.phoneNumber ?? '',
-            'authProvider': 'google',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        _showTopNotification(context, 'Google Sign-In completed successfully!');
-        context.go('/processing', extra: {'email': user.email!});
-      }
-    } catch (e) {
-      _showTopNotification(context, 'Google Sign-In failed.', isError: true);
-    } finally {
-      setState(() => _isGoogleLoading = false);
-    }
-  }
-
-  // 4️⃣ PHONE OTP ENGINE WITH 1-MIN TIMER
+  // 3️⃣ Phone Verification (Fixes Auto-Redirect Bug)
   Future<void> _executePhoneVerification() async {
     if (_phoneController.text.length != 10) {
-      _showTopNotification(context, 'Please enter a valid 10-digit phone number.', isError: true);
+      _showTopNotification(context, 'Enter a valid 10-digit phone number.', isError: true);
       return;
     }
 
@@ -434,36 +441,53 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       if (kIsWeb) {
         if (!_showOtpVerificationField) {
           setState(() => _isOtpLoading = true);
+
+          if (_isForgotPasswordMode) {
+            final query = await db.collection('users').where('phone', isEqualTo: _phoneController.text.trim()).get();
+            if (query.docs.isEmpty) {
+              _showTopNotification(context, 'No account found with this phone.', isError: true);
+              setState(() => _isOtpLoading = false);
+              return;
+            }
+            _linkedUsernamesList = query.docs.map((e) => e.data()['username'].toString()).toList();
+            _selectedResetUsername = _linkedUsernamesList.first;
+          }
+
           _webConfirmationResult = await FirebaseAuth.instance.signInWithPhoneNumber(
             '+91${_phoneController.text.trim()}',
           );
+
           setState(() {
             _showOtpVerificationField = true;
             _isOtpLoading = false;
           });
           _startOtpCountdownTimer();
-          _showTopNotification(context, 'SMS OTP sent! Valid for 60 seconds.');
+          _showTopNotification(context, 'OTP sent on SMS.');
         } else {
           if (_isOtpExpired) {
-            _showTopNotification(context, 'OTP Expired! Reloading screen...', isError: true);
+            _showTopNotification(context, 'OTP Expired!', isError: true);
             _resetToDefaultCredentialsMode();
             return;
           }
 
           if (_otpController.text.trim().isEmpty) {
-            _showTopNotification(context, 'Please enter the 6-digit SMS OTP.', isError: true);
+            _showTopNotification(context, 'Enter 6-digit OTP.', isError: true);
             return;
           }
 
           setState(() => _isOtpLoading = true);
           await _webConfirmationResult!.confirm(_otpController.text.trim());
           _otpTimer?.cancel();
-          
+
+          // 🛑 Key Fix: Log out immediately so GoRouter stays on this screen
+          await FirebaseAuth.instance.signOut();
+
           if (_isForgotPasswordMode) {
             setState(() {
               _isResetPhoneVerified = true;
               _isOtpLoading = false;
             });
+            _showTopNotification(context, 'OTP Verified! Enter new password.');
             return;
           }
 
@@ -473,7 +497,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             setState(() => _isOtpLoading = false);
             _showMultiAccountSelector(query.docs);
           } else {
-            _showTopNotification(context, 'No account linked to this number. Complete your profile setup.');
+            _showTopNotification(context, 'No account linked. Create new account.');
             setState(() {
               _isNewPhoneUser = true;
               _isOtpLoading = false;
@@ -482,22 +506,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         }
       }
     } catch (e) {
-      _showTopNotification(context, 'Invalid OTP or network timeout. Auto-reloading...', isError: true);
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) _resetToDefaultCredentialsMode();
-      });
+      _showTopNotification(context, 'Invalid OTP Code.', isError: true);
     } finally {
       setState(() => _isOtpLoading = false);
     }
   }
 
-  // 5️⃣ FORGOT PASSWORD & UPDATE ENGINE
+  // 4️⃣ Forgot Password New Password Save
   Future<void> _executeSaveNewPassword() async {
     final p1 = _newPasswordController.text.trim();
     final p2 = _confirmPasswordController.text.trim();
 
     if (p1.isEmpty || p1.length < 6) {
-      _showTopNotification(context, 'Password must be at least 6 characters long.', isError: true);
+      _showTopNotification(context, 'Password must be min 6 characters.', isError: true);
       return;
     }
 
@@ -509,18 +530,18 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     setState(() => _isFormLoading = true);
 
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await user.updatePassword(p1);
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'passwordUpdatedAt': FieldValue.serverTimestamp(),
-        });
+      final db = FirebaseFirestore.instance;
+      final query = await db.collection('users').where('username', isEqualTo: _selectedResetUsername).get();
 
-        _showTopNotification(context, 'New password updated successfully!');
+      if (query.docs.isNotEmpty) {
+        final email = query.docs.first.data()['email'];
+        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+        _showTopNotification(context, 'Password reset link sent to $email.');
         _resetToDefaultCredentialsMode();
       }
     } catch (e) {
-      _showTopNotification(context, 'Failed to update password: $e', isError: true);
+      _showTopNotification(context, 'Failed to update password.', isError: true);
     } finally {
       setState(() => _isFormLoading = false);
     }
@@ -528,12 +549,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   void _resetToDefaultCredentialsMode() {
     _otpTimer?.cancel();
+    _emailVerificationTimer?.cancel();
     setState(() {
       _isPhoneAuthMode = false;
       _isForgotPasswordMode = false;
       _isResetPhoneVerified = false;
       _isNewPhoneUser = false;
       _isSignUpMode = false;
+      _isWaitingEmailVerification = false;
       _showOtpVerificationField = false;
       _otpSecondsRemaining = 60;
       _isOtpExpired = false;
@@ -541,6 +564,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       _otpController.clear();
       _identityController.clear();
       _passwordController.clear();
+      _fullNameController.clear();
+      _usernameController.clear();
+      _emailController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
       _formKey.currentState?.reset();
     });
   }
@@ -558,7 +586,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       backgroundColor: const Color(0xFF0F172A),
       body: Row(
         children: [
-          // 💻 DESKTOP LIVE ANIMATED SIDE PANEL (Shop Profile & Customers Feed)
           if (isDesktop)
             Expanded(
               child: AnimatedBuilder(
@@ -590,7 +617,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         ),
                         const SizedBox(height: 24),
                         
-                        // Shop & Phone Live Status Card
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -640,7 +666,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               const Divider(color: Colors.white12),
                               const SizedBox(height: 12),
 
-                              // Real-time Scrolling Activity Feed
                               const Text('Live Ledger Activity:', style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
                               AnimatedSwitcher(
@@ -664,7 +689,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               ),
             ),
           
-          // 📱 MAIN FORM INTERACTIVE PANEL
           Expanded(
             flex: isDesktop ? 0 : 1,
             child: Container(
@@ -683,20 +707,54 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Top Header Title
                         Text(
-                          _isForgotPasswordMode 
-                              ? 'Reset Password' 
-                              : (_isPhoneAuthMode 
-                                  ? (_isNewPhoneUser ? 'Create New Account Setup' : 'Phone Gateway Login') 
-                                  : (_isSignUpMode ? 'Register New Account' : 'Smart Ledger Login')), 
+                          _isWaitingEmailVerification
+                              ? 'Verify Your Email'
+                              : (_isForgotPasswordMode 
+                                  ? 'Reset Password' 
+                                  : (_isPhoneAuthMode 
+                                      ? (_isNewPhoneUser ? 'Create New Account Setup' : 'Phone Gateway Login') 
+                                      : (_isSignUpMode ? 'Register New Account' : 'Smart Ledger Login'))), 
                           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white), 
                           textAlign: TextAlign.center
                         ),
                         const SizedBox(height: 24),
 
-                        // VIEW 1: FORGOT PASSWORD FLOW
-                        if (_isForgotPasswordMode) ...[
+                        // EMAIL VERIFICATION VIEW
+                        if (_isWaitingEmailVerification) ...[
+                          const Icon(Icons.mark_email_unread_rounded, color: Color(0xFF38BDF8), size: 60),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Verification link sent to:\n${_emailController.text.trim()}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Click the verification link in your email to proceed.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: _openEmailApp,
+                              icon: const Icon(Icons.mail_rounded, color: Colors.white),
+                              label: const Text('Open Email App'),
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0066CC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            onPressed: _resetToDefaultCredentialsMode,
+                            style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24)),
+                            child: const Text('Back to Login', style: TextStyle(color: Colors.white70)),
+                          ),
+                        ]
+
+                        // FORGOT PASSWORD VIEW
+                        else if (_isForgotPasswordMode) ...[
                           if (!_isResetPhoneVerified) ...[
                             TextFormField(
                               controller: _phoneController,
@@ -735,6 +793,22 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               ),
                             ),
                           ] else ...[
+                            if (_linkedUsernamesList.isNotEmpty) ...[
+                              DropdownButtonFormField<String>(
+                                value: _selectedResetUsername,
+                                dropdownColor: const Color(0xFF0F172A),
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  labelText: 'Select Account Username',
+                                  filled: true,
+                                  fillColor: const Color(0xFF0F172A),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                ),
+                                items: _linkedUsernamesList.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                                onChanged: (v) => setState(() => _selectedResetUsername = v),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             TextFormField(
                               controller: _newPasswordController,
                               obscureText: true,
@@ -769,8 +843,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ),
                           ],
                           const SizedBox(height: 12),
-                          
-                          // 🏠 Direct "Back to Home" Button
                           OutlinedButton.icon(
                             onPressed: _resetToDefaultCredentialsMode,
                             icon: const Icon(Icons.home_rounded, color: Color(0xFF38BDF8), size: 18),
@@ -779,7 +851,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           ),
                         ]
 
-                        // VIEW 2: PHONE OTP GATEWAY (INCLUDES NEW USER SETUP)
+                        // PHONE LOGIN VIEW
                         else if (_isPhoneAuthMode) ...[
                           if (!_isNewPhoneUser) ...[
                             TextFormField(
@@ -819,7 +891,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               ),
                             ),
                           ] else ...[
-                            // New Phone User Setup Form
                             TextFormField(
                               controller: _fullNameController,
                               style: const TextStyle(color: Colors.white),
@@ -829,6 +900,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 fillColor: const Color(0xFF0F172A),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
+                              validator: (v) => v!.isEmpty ? 'Required field' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
@@ -840,6 +912,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 fillColor: const Color(0xFF0F172A),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
+                              validator: (v) => v!.isEmpty ? 'Required field' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
@@ -851,6 +924,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 fillColor: const Color(0xFF0F172A),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
+                              validator: (v) => v!.isEmpty ? 'Required field' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
@@ -858,11 +932,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               obscureText: _obscurePassword,
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
-                                labelText: 'Set Account Password',
+                                labelText: 'Set Password',
                                 filled: true,
                                 fillColor: const Color(0xFF0F172A),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
+                              validator: (v) => v!.length < 6 ? 'Min 6 characters' : null,
                             ),
                             const SizedBox(height: 16),
                             SizedBox(
@@ -875,8 +950,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ),
                           ],
                           const SizedBox(height: 12),
-
-                          // 🏠 Direct "Back to Home" Button
                           OutlinedButton.icon(
                             onPressed: _resetToDefaultCredentialsMode,
                             icon: const Icon(Icons.home_rounded, color: Color(0xFF38BDF8), size: 18),
@@ -885,7 +958,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           ),
                         ]
                         
-                        // VIEW 3: STANDARD LOGIN & SIGNUP FORM
+                        // MAIN LOGIN VIEW
                         else ...[
                           if (!_isSignUpMode) ...[
                             TextFormField(
@@ -899,7 +972,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 fillColor: const Color(0xFF0F172A),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
-                              validator: (v) => v!.isEmpty ? 'Please enter username, email or mobile number.' : null,
+                              validator: (v) => v!.isEmpty ? 'Enter username, email or phone.' : null,
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
@@ -922,17 +995,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ),
                           ] else ...[
                             TextFormField(
-                              controller: _emailController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Email Address',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextFormField(
                               controller: _fullNameController,
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
@@ -948,6 +1010,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
                                 labelText: 'Unique Username',
+                                filled: true,
+                                fillColor: const Color(0xFF0F172A),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _emailController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: 'Email Address',
                                 filled: true,
                                 fillColor: const Color(0xFF0F172A),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
@@ -1014,24 +1087,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                               ),
                             ),
-                            const SizedBox(height: 12),
                           ],
-
-                          SizedBox(
-                            height: 48,
-                            child: OutlinedButton(
-                              onPressed: staticAnyActiveLoad ? null : _executeGoogleAuthentication,
-                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24), backgroundColor: const Color(0xFF0F172A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.g_mobiledata_rounded, color: Colors.amber, size: 30),
-                                  SizedBox(width: 8),
-                                  Text('Continue with Google Workspace', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                          )
                         ],
                         const SizedBox(height: 24),
 
@@ -1043,6 +1099,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 _isSignUpMode = !_isSignUpMode;
                                 _isPhoneAuthMode = false;
                                 _isForgotPasswordMode = false;
+                                _isWaitingEmailVerification = false;
                               });
                             },
                             style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFF0066CC)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
