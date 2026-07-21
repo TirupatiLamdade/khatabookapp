@@ -1,11 +1,19 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ShopManageScreen extends StatefulWidget {
-  // 🔐 100% EXACT LOGIC & CONSTRUCTOR PRESERVED: आपका पुराना कंस्ट्रक्टर आर्किटेक्चर वैसा ही है
-  const ShopManageScreen({Key? key, required String prefilledEmail, required String prefilledPhone}) : super(key: key);
+  // 🔐 FIELDS ADDED: आता कंपायलर एरर पूर्णपणे दूर झाली आहे
+  final String prefilledEmail;
+  final String prefilledPhone;
+
+  const ShopManageScreen({
+    Key? key, 
+    required this.prefilledEmail, 
+    required this.prefilledPhone,
+  }) : super(key: key);
 
   @override
   State<ShopManageScreen> createState() => _ShopManageScreenState();
@@ -21,10 +29,11 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
   final _phoneController = TextEditingController();
   final _gstinController = TextEditingController();
   final _addressController = TextEditingController();
+  final _categoryController = TextEditingController();
 
-  String? _selectedCategory;
   String _currentUsername = 'Loading Operational Node...';
   String _currentPasswordDisplay = '••••••••••••••••'; 
+  bool _obscurePassword = true;
   bool _isProfileLoading = true;
   bool _isSaving = false;
 
@@ -53,6 +62,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
     _phoneController.dispose();
     _gstinController.dispose();
     _addressController.dispose();
+    _categoryController.dispose();
     super.dispose();
   }
 
@@ -61,8 +71,8 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
       final User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         setState(() {
-          _emailController.text = user.email ?? '';
-          _phoneController.text = user.phoneNumber ?? '';
+          _emailController.text = user.email ?? widget.prefilledEmail;
+          _phoneController.text = user.phoneNumber ?? widget.prefilledPhone;
         });
 
         final docSnapshot = await FirebaseFirestore.instance
@@ -74,22 +84,35 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
           final data = docSnapshot.data()!;
           setState(() {
             _currentUsername = data['username'] ?? 'User Operator';
+            if (data['password'] != null) {
+              _currentPasswordDisplay = data['password'];
+            }
             
+            if (data['fullName'] != null && _ownerNameController.text.isEmpty) {
+              _ownerNameController.text = data['fullName'];
+            }
             if (data['shopName'] != null) _shopNameController.text = data['shopName'];
-            if (data['ownerName'] != null) _ownerNameController.text = data['ownerName'];
-            if (data['phone'] != null && _phoneController.text.isEmpty) _phoneController.text = data['phone'];
-            if (data['email'] != null && _emailController.text.isEmpty) _emailController.text = data['email'];
+            if (data['ownerName'] != null && data['ownerName'].toString().isNotEmpty) {
+              _ownerNameController.text = data['ownerName'];
+            }
+            if (data['phone'] != null && data['phone'].toString().isNotEmpty) {
+              _phoneController.text = data['phone'];
+            }
+            if (data['email'] != null && data['email'].toString().isNotEmpty) {
+              _emailController.text = data['email'];
+            }
             if (data['gstin'] != null) _gstinController.text = data['gstin'];
             if (data['shopAddress'] != null) _addressController.text = data['shopAddress'];
-            
-            if (data['businessCategory'] != null && _businessCategories.contains(data['businessCategory'])) {
-              _selectedCategory = data['businessCategory'];
+            if (data['businessCategory'] != null) {
+              _categoryController.text = data['businessCategory'];
             }
           });
         }
       } else {
         setState(() {
           _currentUsername = 'Demo Operator';
+          if (widget.prefilledEmail.isNotEmpty) _emailController.text = widget.prefilledEmail;
+          if (widget.prefilledPhone.isNotEmpty) _phoneController.text = widget.prefilledPhone;
         });
       }
     } catch (e) {
@@ -99,37 +122,40 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
     }
   }
 
+  // 🚀 प्रोफाइल सेव्ह झाल्यावर थेट /home (HomeScreen) वर रिडायरेक्ट करणे
   Future<void> _saveShopDetails() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
     try {
-      final User? user = FirebaseAuth.instance.currentUser;
+      User? user = FirebaseAuth.instance.currentUser;
+      
       final Map<String, dynamic> updatePayload = {
+        'username': _currentUsername,
         'shopName': _shopNameController.text.trim(),
         'ownerName': _ownerNameController.text.trim(),
+        'fullName': _ownerNameController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
-        'businessCategory': _selectedCategory,
+        'businessCategory': _categoryController.text.trim(),
         'gstin': _gstinController.text.trim().toUpperCase(),
         'shopAddress': _addressController.text.trim(),
-        'firstLogin': false, // 🚀 Profile Setup 완료: Mark firstLogin as false
+        'isFirstTime': false, 
+        'firstLogin': false,
         'updatedAt': FieldValue.serverTimestamp(),
         'lastUpdated': FieldValue.serverTimestamp(),
       };
 
       if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update(updatePayload);
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set(updatePayload, SetOptions(merge: true));
       }
       
-      _showTopNotification('Business Profile Initialized & Saved Successfully.');
+      _showTopNotification('Business Profile Saved Successfully.');
       
-      // ➡️ 🚀 Stack Clear & Navigate to Home Screen
-      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (mounted) {
-          context.go('/home'); 
-        }
-      });
+      // ➡️ 🚀 Direct Redirect to HomeScreen (`/home`)
+      if (mounted) {
+        context.go('/home'); 
+      }
     } catch (e) {
       _showTopNotification('Failed to synchronize cloud database ledger.', isError: true);
     } finally {
@@ -183,7 +209,6 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
     final isTablet = size.width > 640 && size.width <= 1024;
     final layoutWidth = isDesktop ? 850.0 : (isTablet ? size.width * 0.90 : size.width);
 
-    // 🛠️ FIX: PopScope का उपयोग करके बैक नेविगेशन को लॉक रखा गया है
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -216,7 +241,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFF1E293B),
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white24, width: 1),
+                            border: Border.all(color: Colors.white12, width: 1),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +265,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
                                 runSpacing: 16,
                                 children: [
                                   _buildReadOnlyCredentialWidget('OPERATOR NODE USERNAME', _currentUsername, size.width, isDesktop, isTablet),
-                                  _buildReadOnlyCredentialWidget('SECURITY TOKEN DISPLAY', _currentPasswordDisplay, size.width, isDesktop, isTablet),
+                                  _buildPasswordWidget(size.width, isDesktop, isTablet),
                                   _buildReadOnlyCredentialWidget('SYNCHRONIZED METADATA EMAIL', _emailController.text, size.width, isDesktop, isTablet),
                                   _buildReadOnlyCredentialWidget('VERIFIED COMMUNICATION MOBILE', _phoneController.text.isNotEmpty ? _phoneController.text : 'Not Linked', size.width, isDesktop, isTablet),
                                 ],
@@ -256,7 +281,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFF1E293B),
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white24, width: 1),
+                            border: Border.all(color: Colors.white12, width: 1),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -344,11 +369,14 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
             Expanded(
               child: TextFormField(
                 controller: _emailController,
-                readOnly: true,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.bold),
-                decoration: _buildFormInputDecoration('Synchronized Authentication Email', 'Linked account token email address', Icons.mail_outline_rounded).copyWith(
-                  fillColor: const Color(0xFF0F172A), 
-                ),
+                enabled: !_isSaving,
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                decoration: _buildFormInputDecoration('Synchronized Email Address *', 'example@gmail.com', Icons.mail_outline_rounded),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Email address is mandatory.';
+                  if (!v.contains('@') || !v.endsWith('.com')) return 'Must be a valid email ending with .com (e.g. user@gmail.com)';
+                  return null;
+                },
               ),
             ),
             const SizedBox(width: 24),
@@ -356,6 +384,7 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
               child: TextFormField(
                 controller: _phoneController,
                 enabled: !_isSaving,
+                maxLength: 10,
                 style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                 keyboardType: TextInputType.phone,
                 decoration: _buildFormInputDecoration('Mobile Communication Channel *', 'Enter 10-digit primary mobile terminal', Icons.phone_android_rounded, prefixText: '+91 '),
@@ -369,24 +398,25 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                dropdownColor: const Color(0xFF0F172A),
+              child: TextFormField(
+                controller: _categoryController,
+                enabled: !_isSaving,
                 style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 24),
-                decoration: _buildFormInputDecoration('Operational Business Category *', 'Select your operational sector', Icons.category_outlined),
-                items: _businessCategories.map((String category) {
-                  return DropdownMenuItem<String>(
-                    value: category,
-                    child: Text(category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  );
-                }).toList(),
-                onChanged: _isSaving ? null : (value) {
-                  setState(() {
-                    _selectedCategory = value;
-                  });
-                },
-                validator: (v) => v == null ? 'Please map an active business operational standard.' : null,
+                decoration: _buildFormInputDecoration(
+                  'Operational Business Category *', 
+                  'Select or type sector...', 
+                  Icons.category_outlined,
+                  suffixIcon: PopupMenuButton<String>(
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 24),
+                    onSelected: (String value) {
+                      setState(() {
+                        _categoryController.text = value;
+                      });
+                    },
+                    itemBuilder: (context) => _businessCategories.map((c) => PopupMenuItem(value: c, child: Text(c))).toList(),
+                  ),
+                ),
+                validator: (v) => v!.isEmpty ? 'Please map an active business operational standard.' : null,
               ),
             ),
             const SizedBox(width: 24),
@@ -436,40 +466,45 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
         const SizedBox(height: 20),
         TextFormField(
           controller: _emailController,
-          readOnly: true,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.bold),
-          decoration: _buildFormInputDecoration('Synchronized Authentication Email', 'Linked account token email address', Icons.mail_outline_rounded).copyWith(
-            fillColor: const Color(0xFF0F172A), 
-          ),
+          enabled: !_isSaving,
+          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+          decoration: _buildFormInputDecoration('Synchronized Email Address *', 'example@gmail.com', Icons.mail_outline_rounded),
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'Email address is mandatory.';
+            if (!v.contains('@') || !v.endsWith('.com')) return 'Must be a valid email ending with .com (e.g. user@gmail.com)';
+            return null;
+          },
         ),
         const SizedBox(height: 20),
         TextFormField(
           controller: _phoneController,
           enabled: !_isSaving,
+          maxLength: 10,
           style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
           keyboardType: TextInputType.phone,
           decoration: _buildFormInputDecoration('Mobile Communication Channel *', 'Enter 10-digit primary mobile terminal', Icons.phone_android_rounded, prefixText: '+91 '),
           validator: (v) => (v == null || v.isEmpty || v.length != 10) ? 'Provide verified 10-digit communication gateway.' : null,
         ),
         const SizedBox(height: 20),
-        DropdownButtonFormField<String>(
-          value: _selectedCategory,
-          dropdownColor: const Color(0xFF0F172A),
+        TextFormField(
+          controller: _categoryController,
+          enabled: !_isSaving,
           style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 24),
-          decoration: _buildFormInputDecoration('Operational Business Category *', 'Select your operational sector', Icons.category_outlined),
-          items: _businessCategories.map((String category) {
-            return DropdownMenuItem<String>(
-              value: category,
-              child: Text(category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            );
-          }).toList(),
-          onChanged: _isSaving ? null : (value) {
-            setState(() {
-              _selectedCategory = value;
-            });
-          },
-          validator: (v) => v == null ? 'Please map an active business operational standard.' : null,
+          decoration: _buildFormInputDecoration(
+            'Operational Business Category *', 
+            'Select or type sector...', 
+            Icons.category_outlined,
+            suffixIcon: PopupMenuButton<String>(
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 24),
+              onSelected: (String value) {
+                setState(() {
+                  _categoryController.text = value;
+                });
+              },
+              itemBuilder: (context) => _businessCategories.map((c) => PopupMenuItem(value: c, child: Text(c))).toList(),
+            ),
+          ),
+          validator: (v) => v!.isEmpty ? 'Please map an active business operational standard.' : null,
         ),
         const SizedBox(height: 20),
         TextFormField(
@@ -521,7 +556,51 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
     );
   }
 
-  InputDecoration _buildFormInputDecoration(String labelText, String hintText, IconData prefixIcon, {String? prefixText}) {
+  Widget _buildPasswordWidget(double totalWidth, bool isDesktop, bool isTablet) {
+    double targetedWidth;
+    if (isDesktop) {
+      targetedWidth = (850.0 - 56 - 48) / 2; 
+    } else if (isTablet) {
+      targetedWidth = (totalWidth * 0.90 - 48 - 16) / 2;
+    } else {
+      targetedWidth = totalWidth; 
+    }
+
+    return Container(
+      width: targetedWidth,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A), 
+        borderRadius: BorderRadius.circular(10), 
+        border: Border.all(color: Colors.white12, width: 1)
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('SECURITY TOKEN DISPLAY', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const SizedBox(height: 2),
+                Text(
+                  _obscurePassword ? '••••••••••••••••' : _currentPasswordDisplay, 
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: const Color(0xFF94A3B8), size: 20),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _buildFormInputDecoration(String labelText, String hintText, IconData prefixIcon, {String? prefixText, Widget? suffixIcon}) {
     return InputDecoration(
       labelText: labelText,
       labelStyle: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
@@ -530,11 +609,13 @@ class _ShopManageScreenState extends State<ShopManageScreen> {
       prefixIcon: Icon(prefixIcon, color: const Color(0xFF38BDF8), size: 18),
       prefixText: prefixText,
       prefixStyle: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+      suffixIcon: suffixIcon,
+      counterText: "",
       filled: true,
       fillColor: const Color(0xFF0F172A),
       errorStyle: const TextStyle(color: Color(0xFFF87171), fontWeight: FontWeight.bold, fontSize: 12),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white30, width: 1)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12, width: 1)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white12, width: 1)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5)),
       errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1)),
       focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),

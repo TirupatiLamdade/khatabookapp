@@ -1,3 +1,5 @@
+
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -34,7 +36,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   bool _isResetPhoneVerified = false;
   bool _isNewPhoneUser = false;
   bool _isWaitingEmailVerification = false;
+  
+  // Obscure Toggles for Passwords
   bool _obscurePassword = true; 
+  bool _obscureNewPassword = true;
+  bool _obscureConfirmPassword = true;
   
   // Dropdown items for Forgot Password
   List<String> _linkedUsernamesList = [];
@@ -58,8 +64,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   late AnimationController _pulseController;
   
   final List<String> _liveActivityFeed = [
-    "Rajesh Sharma added ₹500 credit",
-    "Suresh Patil paid ₹1,200 balance",
+    "Rajesh Sharma added credit",
+    "Suresh Patil paid balance",
     "New transaction linked to Shop Ledger",
     "Vijay Kumar requested digital receipt",
     "Aniket Deshmukh cleared pending bill"
@@ -108,6 +114,38 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     super.dispose();
   }
 
+  // Soft Thin Border Decoration Helper
+  InputDecoration _softInputDecoration({
+    required String labelText,
+    String? prefixText,
+    Widget? suffixIcon,
+    String? counterText = "",
+  }) {
+    return InputDecoration(
+      labelText: labelText,
+      labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+      prefixText: prefixText,
+      prefixStyle: const TextStyle(color: Colors.white),
+      suffixIcon: suffixIcon,
+      counterText: counterText,
+      filled: true,
+      fillColor: const Color(0xFF0F172A),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.white12, width: 1.0),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.white12, width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.2),
+      ),
+    );
+  }
+
   void _startOtpCountdownTimer() {
     _otpTimer?.cancel();
     setState(() {
@@ -121,11 +159,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       } else {
         _otpTimer?.cancel();
         setState(() => _isOtpExpired = true);
-        _showTopNotification(context, 'OTP expired! Reloading...', isError: true);
-        
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) _resetToDefaultCredentialsMode();
-        });
       }
     });
   }
@@ -207,11 +240,45 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       context.go('/processing', extra: {
         'next': isFirstTime ? '/shop-setup' : '/home',
         'email': email,
+        'phone': _phoneController.text.trim(),
       });
     }
   }
 
-  // 👥 Multi-Account Selection Sheet
+  // 🌐 Google Sign-In Function
+  Future<void> _executeGoogleLogin() async {
+    setState(() => _isGoogleLoading = true);
+    try {
+      GoogleAuthProvider googleProvider = GoogleAuthProvider();
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      
+      User? user = userCredential.user;
+      if (user != null) {
+        final db = FirebaseFirestore.instance;
+        final doc = await db.collection('users').doc(user.uid).get();
+
+        if (!doc.exists) {
+          await db.collection('users').doc(user.uid).set({
+            'uid': user.uid,
+            'fullName': user.displayName ?? 'Google User',
+            'username': user.email!.split('@')[0],
+            'email': user.email,
+            'phone': user.phoneNumber ?? '',
+            'isFirstTime': true,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+        _showTopNotification(context, 'Google Sign-In Successful!');
+        await _processUserPostLogin(user.uid, user.email ?? '');
+      }
+    } catch (e) {
+      _showTopNotification(context, 'Google Auth Failed or Cancelled', isError: true);
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
+  }
+
+  // 👥 Multi-Account Selection Sheet (फक्त पासवर्ड बरोबर असल्यावरच दाखवले जाईल)
   void _showMultiAccountSelector(List<QueryDocumentSnapshot<Map<String, dynamic>>> accounts) {
     showModalBottomSheet(
       context: context,
@@ -220,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (bottomSheetContext) {
         return Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
@@ -260,10 +327,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 16),
-                  onTap: () {
-                    Navigator.pop(context);
+                  onTap: () async {
+                    Navigator.pop(bottomSheetContext);
                     _showTopNotification(context, 'Logging in as $username...');
-                    _processUserPostLogin(uid, email);
+                    await _processUserPostLogin(uid, email);
                   },
                 );
               }).toList(),
@@ -288,7 +355,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 ),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF10B981), size: 16),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(bottomSheetContext);
                   setState(() {
                     _isPhoneAuthMode = true;
                     _isNewPhoneUser = true;
@@ -362,50 +429,78 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       if (currentUser != null && currentUser.emailVerified) {
         timer.cancel();
         _showTopNotification(context, 'Email verified! Redirecting...');
-        _processUserPostLogin(uid, email);
+        await _processUserPostLogin(uid, email);
       }
     });
   }
 
-  // 2️⃣ Standard Credentials Login
+  // 2️⃣ Standard Credentials Login (आधी पासवर्ड तपासेल, मगच लिस्ट/होम दाखवेल)
   Future<void> _executeUnifiedLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isFormLoading = true);
     final db = FirebaseFirestore.instance;
     final input = _identityController.text.trim().toLowerCase();
-    String? resolvedEmail;
+    final passwordInput = _passwordController.text.trim();
 
     try {
-      if (input.contains('@')) {
-        resolvedEmail = input;
-      } else {
-        final queryUsername = await db.collection('users').where('username', isEqualTo: input).get();
+      // 📱 Case 1: Phone number entered
+      final queryPhone = await db.collection('users').where('phone', isEqualTo: input).get();
 
-        if (queryUsername.docs.isNotEmpty) {
-          resolvedEmail = queryUsername.docs.first.data()['email'];
+      if (queryPhone.docs.isNotEmpty) {
+        List<QueryDocumentSnapshot<Map<String, dynamic>>> validAccounts = [];
+
+        for (var doc in queryPhone.docs) {
+          final accountEmail = doc.data()['email'];
+          if (accountEmail != null && accountEmail.toString().isNotEmpty) {
+            try {
+              // Check if entered password matches this account
+              await FirebaseAuth.instance.signInWithEmailAndPassword(
+                email: accountEmail,
+                password: passwordInput,
+              );
+              validAccounts.add(doc);
+            } catch (_) {
+              // Password did not match this account
+            }
+          }
+        }
+
+        if (validAccounts.isEmpty) {
+          _showTopNotification(context, 'Invalid password or user details.', isError: true);
+          return;
+        } else if (validAccounts.length > 1) {
+          _showMultiAccountSelector(validAccounts);
+          return;
         } else {
-          final queryPhone = await db.collection('users').where('phone', isEqualTo: input).get();
-
-          if (queryPhone.docs.length > 1) {
-            setState(() => _isFormLoading = false);
-            _showMultiAccountSelector(queryPhone.docs);
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            _showTopNotification(context, 'Login successful!');
+            await _processUserPostLogin(currentUser.uid, currentUser.email ?? '');
             return;
-          } else if (queryPhone.docs.length == 1) {
-            resolvedEmail = queryPhone.docs.first.data()['email'];
           }
         }
       }
 
+      // 📧/👤 Case 2: Username or Email entered
+      String? resolvedEmail;
+      if (input.contains('@')) {
+        resolvedEmail = input;
+      } else {
+        final queryUsername = await db.collection('users').where('username', isEqualTo: input).get();
+        if (queryUsername.docs.isNotEmpty) {
+          resolvedEmail = queryUsername.docs.first.data()['email'];
+        }
+      }
+
       if (resolvedEmail == null || resolvedEmail.isEmpty) {
-        _showTopNotification(context, 'Invalid user details.', isError: true);
-        setState(() => _isFormLoading = false);
+        _showTopNotification(context, 'Invalid username, phone, or password.', isError: true);
         return;
       }
 
       UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: resolvedEmail,
-        password: _passwordController.text.trim(),
+        password: passwordInput,
       );
 
       await userCredential.user!.reload();
@@ -414,24 +509,26 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       if (currentUser != null && !currentUser.emailVerified) {
         _showTopNotification(context, 'Please verify email before logging in.', isError: true);
         await FirebaseAuth.instance.signOut();
-        setState(() => _isFormLoading = false);
         return;
       }
 
       _showTopNotification(context, 'Login successful!');
-      _processUserPostLogin(currentUser!.uid, resolvedEmail);
+      await _processUserPostLogin(currentUser!.uid, resolvedEmail);
 
     } on FirebaseAuthException catch (e) {
-      _showTopNotification(context, 'Invalid password or user record.', isError: true);
+      _showTopNotification(context, 'Invalid username, phone, or password.', isError: true);
+    } catch (e) {
+      _showTopNotification(context, 'Login failed. Please check details.', isError: true);
     } finally {
-      setState(() => _isFormLoading = false);
+      if (mounted) setState(() => _isFormLoading = false);
     }
   }
 
-  // 3️⃣ Phone Verification (Fixes Auto-Redirect Bug)
+  // 3️⃣ Phone Verification
   Future<void> _executePhoneVerification() async {
-    if (_phoneController.text.length != 10) {
-      _showTopNotification(context, 'Enter a valid 10-digit phone number.', isError: true);
+    final phoneInput = _phoneController.text.trim();
+    if (phoneInput.length != 10 || !RegExp(r'^[0-9]+$').hasMatch(phoneInput)) {
+      _showTopNotification(context, 'Please enter a valid 10-digit mobile number!', isError: true);
       return;
     }
 
@@ -439,11 +536,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
     try {
       if (kIsWeb) {
-        if (!_showOtpVerificationField) {
+        if (!_showOtpVerificationField || _isOtpExpired) {
           setState(() => _isOtpLoading = true);
 
           if (_isForgotPasswordMode) {
-            final query = await db.collection('users').where('phone', isEqualTo: _phoneController.text.trim()).get();
+            final query = await db.collection('users').where('phone', isEqualTo: phoneInput).get();
             if (query.docs.isEmpty) {
               _showTopNotification(context, 'No account found with this phone.', isError: true);
               setState(() => _isOtpLoading = false);
@@ -454,7 +551,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           }
 
           _webConfirmationResult = await FirebaseAuth.instance.signInWithPhoneNumber(
-            '+91${_phoneController.text.trim()}',
+            '+91$phoneInput',
           );
 
           setState(() {
@@ -462,25 +559,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             _isOtpLoading = false;
           });
           _startOtpCountdownTimer();
-          _showTopNotification(context, 'OTP sent on SMS.');
+          _showTopNotification(context, 'OTP sent via SMS.');
         } else {
-          if (_isOtpExpired) {
-            _showTopNotification(context, 'OTP Expired!', isError: true);
-            _resetToDefaultCredentialsMode();
-            return;
-          }
-
           if (_otpController.text.trim().isEmpty) {
-            _showTopNotification(context, 'Enter 6-digit OTP.', isError: true);
+            _showTopNotification(context, 'Enter 6-digit OTP code.', isError: true);
             return;
           }
 
           setState(() => _isOtpLoading = true);
-          await _webConfirmationResult!.confirm(_otpController.text.trim());
+          UserCredential userCred = await _webConfirmationResult!.confirm(_otpController.text.trim());
           _otpTimer?.cancel();
-
-          // 🛑 Key Fix: Log out immediately so GoRouter stays on this screen
-          await FirebaseAuth.instance.signOut();
 
           if (_isForgotPasswordMode) {
             setState(() {
@@ -491,11 +579,18 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             return;
           }
 
-          final query = await db.collection('users').where('phone', isEqualTo: _phoneController.text.trim()).get();
+          final query = await db.collection('users').where('phone', isEqualTo: phoneInput).get();
 
           if (query.docs.isNotEmpty) {
-            setState(() => _isOtpLoading = false);
-            _showMultiAccountSelector(query.docs);
+            if (query.docs.length > 1) {
+              setState(() => _isOtpLoading = false);
+              _showMultiAccountSelector(query.docs);
+            } else {
+              final userData = query.docs.first.data();
+              final uid = userCred.user?.uid ?? userData['uid'];
+              final email = userData['email'] ?? '';
+              await _processUserPostLogin(uid, email);
+            }
           } else {
             _showTopNotification(context, 'No account linked. Create new account.');
             setState(() {
@@ -508,17 +603,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     } catch (e) {
       _showTopNotification(context, 'Invalid OTP Code.', isError: true);
     } finally {
-      setState(() => _isOtpLoading = false);
+      if (mounted) setState(() => _isOtpLoading = false);
     }
   }
 
-  // 4️⃣ Forgot Password New Password Save
+  // 4️⃣ Save New Password Logic
   Future<void> _executeSaveNewPassword() async {
     final p1 = _newPasswordController.text.trim();
     final p2 = _confirmPasswordController.text.trim();
 
-    if (p1.isEmpty || p1.length < 6) {
-      _showTopNotification(context, 'Password must be min 6 characters.', isError: true);
+    if (p1.isEmpty) {
+      _showTopNotification(context, 'Please enter a valid password.', isError: true);
       return;
     }
 
@@ -543,7 +638,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     } catch (e) {
       _showTopNotification(context, 'Failed to update password.', isError: true);
     } finally {
-      setState(() => _isFormLoading = false);
+      if (mounted) setState(() => _isFormLoading = false);
     }
   }
 
@@ -586,6 +681,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       backgroundColor: const Color(0xFF0F172A),
       body: Row(
         children: [
+          // 💻 Desktop Left Side
           if (isDesktop)
             Expanded(
               child: AnimatedBuilder(
@@ -634,11 +730,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                     child: Icon(Icons.business_center, color: Colors.white, size: 20),
                                   ),
                                   const SizedBox(width: 14),
-                                  Column(
+                                  const Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Shree Ganesh Traders', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                      Text('Linked Phone: +91 9579680911', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+                                      Text('Shree Ganesh Traders', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Text('Linked Phone Gateway Active', style: TextStyle(color: Colors.white70, fontSize: 13)),
                                     ],
                                   ),
                                   const Spacer(),
@@ -689,6 +785,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               ),
             ),
           
+          // 📱 Responsive Form View
           Expanded(
             flex: isDesktop ? 0 : 1,
             child: Container(
@@ -759,14 +856,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             TextFormField(
                               controller: _phoneController,
                               enabled: !staticAnyActiveLoad,
+                              maxLength: 10,
+                              keyboardType: TextInputType.phone,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Registered Phone Number',
+                              decoration: _softInputDecoration(
+                                labelText: '10-Digit Mobile Number',
                                 prefixText: '+91 ',
-                                prefixStyle: const TextStyle(color: Colors.white),
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -774,12 +869,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               TextFormField(
                                 controller: _otpController,
                                 enabled: !staticAnyActiveLoad,
+                                keyboardType: TextInputType.number,
                                 style: const TextStyle(color: Colors.white),
-                                decoration: InputDecoration(
-                                  labelText: '6-Digit OTP ($_otpSecondsRemaining s remaining)',
-                                  filled: true,
-                                  fillColor: const Color(0xFF0F172A),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                decoration: _softInputDecoration(
+                                  labelText: _isOtpExpired 
+                                      ? 'OTP Expired' 
+                                      : '6-Digit OTP ($_otpSecondsRemaining s remaining)',
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -789,7 +884,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               child: ElevatedButton(
                                 onPressed: staticAnyActiveLoad ? null : _executePhoneVerification,
                                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0066CC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                                child: Text(_showOtpVerificationField ? 'Verify OTP Code' : 'Send Security OTP'),
+                                child: _isOtpLoading
+                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : Text(_showOtpVerificationField 
+                                        ? (_isOtpExpired ? 'Resend OTP' : 'Verify OTP Code') 
+                                        : 'Send Security OTP'),
                               ),
                             ),
                           ] else ...[
@@ -798,38 +897,39 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 value: _selectedResetUsername,
                                 dropdownColor: const Color(0xFF0F172A),
                                 style: const TextStyle(color: Colors.white),
-                                decoration: InputDecoration(
-                                  labelText: 'Select Account Username',
-                                  filled: true,
-                                  fillColor: const Color(0xFF0F172A),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                                ),
+                                decoration: _softInputDecoration(labelText: 'Select Account Username'),
                                 items: _linkedUsernamesList.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                                 onChanged: (v) => setState(() => _selectedResetUsername = v),
                               ),
                               const SizedBox(height: 12),
                             ],
+                            
+                            // Password Input 1
                             TextFormField(
                               controller: _newPasswordController,
-                              obscureText: true,
+                              obscureText: _obscureNewPassword,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
+                              decoration: _softInputDecoration(
                                 labelText: 'Enter New Password',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                suffixIcon: IconButton(
+                                  icon: Icon(_obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: const Color(0xFF94A3B8)),
+                                  onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
+                            
+                            // Password Input 2
                             TextFormField(
                               controller: _confirmPasswordController,
-                              obscureText: true,
+                              obscureText: _obscureConfirmPassword,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
+                              decoration: _softInputDecoration(
                                 labelText: 'Confirm New Password',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                suffixIcon: IconButton(
+                                  icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: const Color(0xFF94A3B8)),
+                                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -838,7 +938,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               child: ElevatedButton(
                                 onPressed: staticAnyActiveLoad ? null : _executeSaveNewPassword,
                                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                                child: const Text('Save & Update Password'),
+                                child: _isFormLoading 
+                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : const Text('Save & Update Password'),
                               ),
                             ),
                           ],
@@ -857,14 +959,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             TextFormField(
                               controller: _phoneController,
                               enabled: !staticAnyActiveLoad,
+                              maxLength: 10,
+                              keyboardType: TextInputType.phone,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Mobile Phone Number',
+                              decoration: _softInputDecoration(
+                                labelText: '10-Digit Mobile Phone Number',
                                 prefixText: '+91 ',
-                                prefixStyle: const TextStyle(color: Colors.white),
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -872,12 +972,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               TextFormField(
                                 controller: _otpController,
                                 enabled: !staticAnyActiveLoad,
+                                keyboardType: TextInputType.number,
                                 style: const TextStyle(color: Colors.white),
-                                decoration: InputDecoration(
-                                  labelText: '6-Digit SMS OTP ($_otpSecondsRemaining s remaining)',
-                                  filled: true,
-                                  fillColor: const Color(0xFF0F172A),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                decoration: _softInputDecoration(
+                                  labelText: _isOtpExpired 
+                                      ? 'OTP Expired' 
+                                      : '6-Digit SMS OTP ($_otpSecondsRemaining s remaining)',
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -887,57 +987,59 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               child: ElevatedButton(
                                 onPressed: staticAnyActiveLoad ? null : _executePhoneVerification,
                                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0066CC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                                child: Text(_showOtpVerificationField ? 'Verify OTP Code' : 'Send Verification OTP'),
+                                child: _isOtpLoading
+                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : Text(_showOtpVerificationField 
+                                        ? (_isOtpExpired ? 'Resend OTP' : 'Verify OTP Code') 
+                                        : 'Send Verification OTP'),
                               ),
                             ),
                           ] else ...[
                             TextFormField(
                               controller: _fullNameController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Full Legal Name',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                              ),
+                              decoration: _softInputDecoration(labelText: 'Full Legal Name'),
                               validator: (v) => v!.isEmpty ? 'Required field' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _usernameController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Unique Username',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                              ),
+                              decoration: _softInputDecoration(labelText: 'Unique Username'),
                               validator: (v) => v!.isEmpty ? 'Required field' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
-                              controller: _emailController,
+                              controller: _phoneController,
+                              maxLength: 10,
+                              keyboardType: TextInputType.phone,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Email Address',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              decoration: _softInputDecoration(
+                                labelText: '10-Digit Mobile Number',
+                                prefixText: '+91 ',
                               ),
-                              validator: (v) => v!.isEmpty ? 'Required field' : null,
+                              validator: (v) => v!.length != 10 ? 'Enter valid 10 digits' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _passwordController,
                               obscureText: _obscurePassword,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
+                              decoration: _softInputDecoration(
                                 labelText: 'Set Password',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                suffixIcon: IconButton(
+                                  icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: const Color(0xFF94A3B8)),
+                                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                ),
                               ),
-                              validator: (v) => v!.length < 6 ? 'Min 6 characters' : null,
+                              validator: (v) => v!.isEmpty ? 'Password is required' : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _emailController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _softInputDecoration(labelText: 'Email Address'),
+                              validator: (v) => v!.isEmpty ? 'Required field' : null,
                             ),
                             const SizedBox(height: 16),
                             SizedBox(
@@ -945,7 +1047,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               child: ElevatedButton(
                                 onPressed: staticAnyActiveLoad ? null : _executeSecureSignUp,
                                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                                child: const Text('Create & Link Account'),
+                                child: _isFormLoading 
+                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : const Text('Create & Link Account'),
                               ),
                             ),
                           ],
@@ -957,7 +1061,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                           ),
                         ]
-                        
+
                         // MAIN LOGIN VIEW
                         else ...[
                           if (!_isSignUpMode) ...[
@@ -965,13 +1069,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               controller: _identityController,
                               enabled: !staticAnyActiveLoad,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Mobile number, username, or email',
-                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                              ),
+                              decoration: _softInputDecoration(labelText: 'Mobile number, username, or email'),
                               validator: (v) => v!.isEmpty ? 'Enter username, email or phone.' : null,
                             ),
                             const SizedBox(height: 16),
@@ -980,12 +1078,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               enabled: !staticAnyActiveLoad,
                               obscureText: _obscurePassword,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
+                              decoration: _softInputDecoration(
                                 labelText: 'Access Password',
-                                labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                                 suffixIcon: IconButton(
                                   icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: const Color(0xFF94A3B8)),
                                   onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -997,46 +1091,23 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             TextFormField(
                               controller: _fullNameController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Full Legal Name',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                              ),
+                              decoration: _softInputDecoration(labelText: 'Full Legal Name'),
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _usernameController,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Unique Username',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _emailController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                labelText: 'Email Address',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                              ),
+                              decoration: _softInputDecoration(labelText: 'Unique Username'),
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _phoneController,
+                              maxLength: 10,
+                              keyboardType: TextInputType.phone,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
+                              decoration: _softInputDecoration(
                                 labelText: '10-Digit Mobile Number',
                                 prefixText: '+91 ',
-                                prefixStyle: const TextStyle(color: Colors.white),
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -1044,12 +1115,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               controller: _passwordController,
                               obscureText: _obscurePassword,
                               style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
+                              decoration: _softInputDecoration(
                                 labelText: 'Set Password',
-                                filled: true,
-                                fillColor: const Color(0xFF0F172A),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                suffixIcon: IconButton(
+                                  icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: const Color(0xFF94A3B8)),
+                                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                ),
                               ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _emailController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _softInputDecoration(labelText: 'Email Address'),
                             ),
                           ],
                           const SizedBox(height: 24),
@@ -1059,7 +1137,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             child: ElevatedButton(
                               onPressed: staticAnyActiveLoad ? null : (_isSignUpMode ? _executeSecureSignUp : _executeUnifiedLogin),
                               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0066CC), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              child: Text(_isSignUpMode ? 'Register New Space' : 'Log In'),
+                              child: _isFormLoading 
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : Text(_isSignUpMode ? 'Register New Space' : 'Log In'),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -1077,6 +1157,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               ],
                             ),
                             const SizedBox(height: 16),
+
+                            SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: staticAnyActiveLoad ? null : _executeGoogleLogin,
+                                icon: _isGoogleLoading 
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2))
+                                    : const Icon(Icons.g_mobiledata_rounded, color: Colors.amber, size: 24),
+                                label: const Text('Continue with Google', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
 
                             SizedBox(
                               height: 44,
