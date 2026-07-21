@@ -1,3 +1,5 @@
+
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -18,13 +20,15 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
   void initState() {
     super.initState();
     
-    // Strict 15-second tracking window
-    const duration = Duration(seconds: 15);
-    const tick = Duration(milliseconds: 100);
+    // ⚡ Smooth & Fast 3-Second Processing Window
+    const duration = Duration(seconds: 3);
+    const tick = Duration(milliseconds: 50);
     int totalTicks = duration.inMilliseconds ~/ tick.inMilliseconds;
     int currentTick = 0;
 
     _timer = Timer.periodic(tick, (timer) {
+      if (!mounted) return;
+
       currentTick++;
       setState(() {
         _progressValue = currentTick / totalTicks;
@@ -32,7 +36,13 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
 
       if (currentTick >= totalTicks) {
         _timer.cancel();
-        context.go('/shop-setup', extra: widget.prefilledData);
+
+        // 🔀 Read Next Destination Dynamically ('/shop-setup' or '/home')
+        final String nextRoute = widget.prefilledData['next'] ?? '/home';
+
+        if (mounted) {
+          context.go(nextRoute, extra: widget.prefilledData);
+        }
       }
     });
   }
@@ -66,14 +76,24 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
                 ),
                 Text(
                   '${(_progressValue * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+                  style: const TextStyle(
+                    color: Colors.white, 
+                    fontSize: 22, 
+                    fontWeight: FontWeight.bold, 
+                    fontFamily: 'Courier',
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 48),
             const Text(
               'Synchronizing Workspaces',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              style: TextStyle(
+                color: Colors.white, 
+                fontSize: 18, 
+                fontWeight: FontWeight.bold, 
+                letterSpacing: 0.5,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
