@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:login_setup/core/config/app_config.dart' show AppConfig;
-import 'package:login_setup/main.dart' show KhatabookSmartApp;
+import 'package:login_setup/main.dart' show KhatabookSmartApp, KhatabookSmartEngineApp;
 
 void main() {
   // टेस्ट शुरू होने से पहले आवश्यक हाइव बॉक्स मॉक सेटअप
@@ -24,7 +24,7 @@ void main() {
     // Riverpod Scope के साथ हमारे मुख्य ऐप को बिल्ड करें
     await tester.pumpWidget(
       const ProviderScope(
-        child: KhatabookSmartApp(),
+        child: KhatabookSmartEngineApp(),
       ),
     );
 
