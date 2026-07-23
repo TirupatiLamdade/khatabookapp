@@ -12,6 +12,7 @@ import '../screens/auth/processing_screen.dart';
 import '../screens/shop/shop_setup_screen.dart';
 import '../screens/dashboard/home_screen.dart';
 
+
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
