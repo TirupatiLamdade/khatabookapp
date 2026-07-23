@@ -1,5 +1,4 @@
 
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -68,7 +67,6 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
       if (_editingTransactionId != null) {
         await _deleteTransactionImpact(_editingTransactionId!);
         await FirebaseFirestore.instance.collection('transactions').doc(_editingTransactionId).update(txData);
-        final String editedId = _editingTransactionId!;
         _editingTransactionId = null;
 
         if (mounted) {
@@ -130,7 +128,8 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     );
   }
 
-  void _triggerDelete(String txId, String productName) async {
+  // 🗑️ UPDATED DELETE TRIGGER: Archives to `deleted_products_history` instead of direct purge
+  void _triggerDelete(String txId, String productName, Map<String, dynamic> txData) async {
     bool confirm = await CustomerDialogs.openSecureDeleteDialog(
       context: context,
       customerId: txId,
@@ -143,16 +142,31 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     if (confirm) {
       _setButtonLoading('tx_del_$txId', true);
       try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+
+        // 1. Save deleted product details to deleted_products_history collection
+        await FirebaseFirestore.instance.collection('deleted_products_history').add({
+          ...txData,
+          'originalTxId': txId,
+          'operatorUid': currentUser?.uid ?? txData['operatorUid'],
+          'deletedAt': FieldValue.serverTimestamp(),
+          'deletedAtIso': DateTime.now().toIso8601String(),
+        });
+
+        // 2. Adjust customer balance impact
         await _deleteTransactionImpact(txId);
+
+        // 3. Remove entry from active transactions collection
         await FirebaseFirestore.instance.collection('transactions').doc(txId).delete();
+
         _setButtonLoading('tx_del_$txId', false);
         if (mounted) {
-          CustomerDialogs.showTopNotification(context, 'Transaction "$productName" purged successfully!');
+          CustomerDialogs.showTopNotification(context, '"$productName" moved to History successfully!');
         }
       } catch (e) {
         _setButtonLoading('tx_del_$txId', false);
         if (mounted) {
-          CustomerDialogs.showTopNotification(context, 'Failed to purge record!', isError: true);
+          CustomerDialogs.showTopNotification(context, 'Failed to move product to history!', isError: true);
         }
       }
     }
@@ -706,7 +720,6 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              // 💬 3rd Option: Commitment Note Modal Trigger
               IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -719,7 +732,6 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 onPressed: () => _showCommitNoteModal(productName, commitMsg),
               ),
               const SizedBox(width: 8),
-              // ✏️ Edit Option
               IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -728,7 +740,6 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 onPressed: () => _triggerEditMode(doc),
               ),
               const SizedBox(width: 8),
-              // 🗑️ Secure Delete Option
               IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -736,7 +747,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                     ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Color(0xFFEF4444), strokeWidth: 2))
                     : const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 20),
                 tooltip: 'Delete Record Entry',
-                onPressed: () => _triggerDelete(txId, productName),
+                onPressed: () => _triggerDelete(txId, productName, tx), // 👈 Updated to pass tx data
               ),
             ],
           )

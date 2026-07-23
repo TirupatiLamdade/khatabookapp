@@ -1,5 +1,4 @@
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../../core/providers/global_provider_hub.dart';
 import '../customer/ledger_screen.dart';
 import '../customer/recycle_bin_screen.dart';
+import '../customer/history_screen.dart'; // 👈 Added HistoryScreen import
 import '../profile/profile_screen.dart';
 import '../setting/setting_screen.dart';
 import '../../widgets/customer_dialogs.dart';
@@ -189,13 +189,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ? null
           : BottomNavigationBar(
               currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
+              onTap: (index) {
+                if (_currentIndex != index) {
+                  setState(() => _currentIndex = index);
+                }
+              },
               backgroundColor: cardBgColor,
               selectedItemColor: const Color(0xFF38BDF8),
               unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
               selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w900),
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
               type: BottomNavigationBarType.fixed,
+              enableFeedback: true,
               items: const [
                 BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'Home'),
                 BottomNavigationBarItem(icon: Icon(Icons.menu_book_rounded), label: 'Ledger Book'),
@@ -271,7 +276,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: InkWell(
-        onTap: () => setState(() => _currentIndex = index),
+        onTap: () {
+          if (_currentIndex != index) {
+            setState(() => _currentIndex = index);
+          }
+        },
         borderRadius: BorderRadius.circular(14),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -338,7 +347,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           borderColor: borderColor,
         ),
         _buildCustomerTab(operatorUid, isDesktop, isDark, textColor, cardBgColor, borderColor),
-        _buildTransactionHistoryView(operatorUid, isDark, textColor, cardBgColor, borderColor),
+        const HistoryScreen(), // 👈 History Flow Tab now directly loads HistoryScreen
         SettingsControlPanel(isDark: isDark, textColor: textColor, cardBgColor: cardBgColor, borderColor: borderColor),
       ],
     );
@@ -606,41 +615,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTransactionHistoryView(String operatorUid, bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('transactions')
-          .where('operatorUid', isEqualTo: operatorUid)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(child: Text('No verified transaction logs archived yet.', style: TextStyle(color: textColor, fontWeight: FontWeight.w900)));
-        }
-        return ListView.builder(
-          key: const PageStorageKey<String>('smooth_tx_list_key'),
-          physics: const BouncingScrollPhysics(),
-          cacheExtent: 500,
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            final tx = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-            final amt = double.tryParse(tx['totalPrice']?.toString() ?? '0.0') ?? 0.0;
-            return Card(
-              color: cardBgColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderColor)),
-              child: ListTile(
-                title: Text(tx['productName'] ?? 'Item Record Entry', style: TextStyle(color: textColor, fontWeight: FontWeight.w900)),
-                subtitle: Text('Merchant: ${tx['customerName']} | Qty: ${tx['quantity']}\nCommitment Note: ${tx['commitMessage'] ?? 'None'}', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700, fontSize: 12)),
-                isThreeLine: true,
-                trailing: Text('₹${amt.toStringAsFixed(2)}', style: TextStyle(color: tx['type'] == 'credit' ? const Color(0xFFEF4444) : const Color(0xFF10B981), fontWeight: FontWeight.w900, fontSize: 14)),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
