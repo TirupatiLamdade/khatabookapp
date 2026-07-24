@@ -1,4 +1,8 @@
+
+
 // import 'package:flutter/material.dart';
+// import 'package:flutter/foundation.dart';
+
 // import 'package:flutter_riverpod/flutter_riverpod.dart';
 // import 'package:firebase_core/firebase_core.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
@@ -28,7 +32,7 @@
 // }
 
 // class KhatabookSmartEngineApp extends ConsumerWidget {
-//   const KhatabookSmartEngineApp({Key? key}) : super(key: key);
+//   const KhatabookSmartEngineApp({super.key}); // 👈 इथे Key चा 'k' small केला आहे
 
 //   @override
 //   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,33 +40,33 @@
 //     final currentThemeMode = ref.watch(themeModeProvider);
 
 //     return MaterialApp.router(
-//       title: 'Khatabook Smart Engine',
+//       title: 'Khatabook',
 //       debugShowCheckedModeBanner: false,
       
-//       // 🌟 Eye-safe Professional Light Theme (Prevents strain during prolonged viewing)
+//       // 🌟 Eye-safe Professional Light Theme
 //       theme: ThemeData(
 //         useMaterial3: true,
 //         colorScheme: ColorScheme.fromSeed(
-//           seedColor: const Color(0xFF1E3A8A), // Clean Premium Deep Navy Blue
+//           seedColor: const Color(0xFF1E3A8A),
 //           brightness: Brightness.light,
-//           surface: const Color(0xFFF8FAFC),    // Ultra-soft off-white surface tint
+//           surface: const Color(0xFFF8FAFC),
 //         ),
 //         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-//         cardTheme: CardThemeData(
+//         cardTheme: const CardThemeData(
 //           color: Colors.white,
 //           elevation: 0,
 //         ),
 //       ),
       
-//       // 🌙 Eye-safe Professional Dark Theme (Soft slate tones instead of pure pitch black)
+//       // 🌙 Eye-safe Professional Dark Theme
 //       darkTheme: ThemeData(
 //         useMaterial3: true,
 //         colorScheme: ColorScheme.fromSeed(
-//           seedColor: const Color(0xFF3B82F6), // Eye-friendly radiant indigo
+//           seedColor: const Color(0xFF3B82F6),
 //           brightness: Brightness.dark,
-//           surface: const Color(0xFF1E293B),    // Muted deep slate gray
+//           surface: const Color(0xFF1E293B),
 //         ),
-//         scaffoldBackgroundColor: const Color(0xFF0F172A), // Dark slate void background
+//         scaffoldBackgroundColor: const Color(0xFF0F172A),
 //       ),
       
 //       // Binds the router configuration and reactive system theme setup
@@ -70,9 +74,11 @@
 //       routerConfig: AppRouter.router,
 //     );
 //   }
-
 // }
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -102,7 +108,7 @@ void main() async {
 }
 
 class KhatabookSmartEngineApp extends ConsumerWidget {
-  const KhatabookSmartEngineApp({Key? key}) : super(key: key);
+  const KhatabookSmartEngineApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -110,7 +116,7 @@ class KhatabookSmartEngineApp extends ConsumerWidget {
     final currentThemeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'Khatabook Smart Engine',
+      title: 'Khatabook',
       debugShowCheckedModeBanner: false,
       
       // 🌟 Eye-safe Professional Light Theme
@@ -141,7 +147,7 @@ class KhatabookSmartEngineApp extends ConsumerWidget {
       
       // Binds the router configuration and reactive system theme setup
       themeMode: currentThemeMode,
-      routerConfig: AppRouter.router, // 👈 Attached AppRouter static router instance
+      routerConfig: AppRouter.router,
     );
   }
 }

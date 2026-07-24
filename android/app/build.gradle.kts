@@ -3,6 +3,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
+
 android {
     namespace = "com.example.login_setup"
     compileSdk = flutter.compileSdkVersion
@@ -41,4 +42,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib")
 }
