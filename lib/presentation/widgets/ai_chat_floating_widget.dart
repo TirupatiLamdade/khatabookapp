@@ -5,7 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:login_setup/core/providers/global_provider_hub.dart' show themeModeProvider;
+import 'package:login_setup/core/providers/global_provider_hub.dart'
+    show themeModeProvider;
 
 class AiChatMessage {
   final String text;
@@ -23,13 +24,15 @@ class AiChatFloatingWidget extends ConsumerStatefulWidget {
   const AiChatFloatingWidget({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<AiChatFloatingWidget> createState() => _AiChatFloatingWidgetState();
+  ConsumerState<AiChatFloatingWidget> createState() =>
+      _AiChatFloatingWidgetState();
 }
 
 class _AiChatFloatingWidgetState extends ConsumerState<AiChatFloatingWidget>
     with SingleTickerProviderStateMixin {
   // 🔑 YOUR WORKING API KEY (X-goog-api-key)
-  static const String _geminiApiKey = 'AQ.Ab8RN6KpQPGbLz3QF4Y1rNWmYhYawSRgZtplZJn9MdCZAkRAHw';
+  static const String _geminiApiKey =
+      ""; //'AQ.Ab8RN6KpQPGbLz3QF4Y1rNWmYhYawSRgZtplZJn9MdCZAkRAHw';
 
   bool _isExpanded = false;
   bool _isLoading = false;
@@ -70,7 +73,8 @@ class _AiChatFloatingWidgetState extends ConsumerState<AiChatFloatingWidget>
     // Initial messages setup
     _messages = [
       AiChatMessage(
-        text: "Welcome to Khatabook Smart! 🤖\nHow can I help you manage your business today?",
+        text:
+            "Welcome to Khatabook Smart! 🤖\nHow can I help you manage your business today?",
         isUser: false,
       ),
     ];
@@ -82,7 +86,8 @@ class _AiChatFloatingWidgetState extends ConsumerState<AiChatFloatingWidget>
     _tooltipTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted) {
         setState(() {
-          _currentTooltipIndex = (_currentTooltipIndex + 1) % _dynamicTooltips.length;
+          _currentTooltipIndex =
+              (_currentTooltipIndex + 1) % _dynamicTooltips.length;
         });
       }
     });
@@ -100,11 +105,16 @@ class _AiChatFloatingWidgetState extends ConsumerState<AiChatFloatingWidget>
             .listen((snapshot) {
           if (snapshot.exists && snapshot.data() != null) {
             final data = snapshot.data()!;
-            
-            // 🟢 फक्त ओव्हरचे नाव (name) प्राधान्याने वाचणे
-            final String fetchedOwnerName = data['name'] ?? data['ownerName'] ?? user.displayName ?? "Shop Owner";
 
-            if (mounted && fetchedOwnerName.isNotEmpty && fetchedOwnerName != _ownerName) {
+            // 🟢 फक्त ओव्हरचे नाव (name) प्राधान्याने वाचणे
+            final String fetchedOwnerName = data['name'] ??
+                data['ownerName'] ??
+                user.displayName ??
+                "Shop Owner";
+
+            if (mounted &&
+                fetchedOwnerName.isNotEmpty &&
+                fetchedOwnerName != _ownerName) {
               setState(() {
                 _ownerName = fetchedOwnerName;
                 _dynamicTooltips = [
@@ -114,7 +124,8 @@ class _AiChatFloatingWidgetState extends ConsumerState<AiChatFloatingWidget>
                 ];
                 // चॅट मधील स्वागत मेसेज लगेच ऑटो-अपडेट होईल
                 _messages[0] = AiChatMessage(
-                  text: "Welcome $_ownerName! 🤖\nI am your Khatabook Smart AI Assistant. How can I help you today?",
+                  text:
+                      "Welcome $_ownerName! 🤖\nI am your Khatabook Smart AI Assistant. How can I help you today?",
                   isUser: false,
                 );
               });
@@ -200,8 +211,9 @@ User Question: $text
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final String aiReply =
-            data['candidates'][0]['content']['parts'][0]['text'] ?? "No response received.";
+        final String aiReply = data['candidates'][0]['content']['parts'][0]
+                ['text'] ??
+            "No response received.";
 
         if (mounted) {
           setState(() {
@@ -237,12 +249,17 @@ User Question: $text
             MediaQuery.of(context).platformBrightness == Brightness.dark);
 
     final cardBgColor = isDark ? const Color(0xFF0F172A) : Colors.white;
-    final headerBgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final headerBgColor =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
     final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final userBubbleBg = isDark ? const Color(0xFF0284C7) : const Color(0xFF0066CC);
-    final aiBubbleBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
-    final inputBgColor = isDark ? const Color(0xFF020617) : const Color(0xFFF1F5F9);
+    final borderColor =
+        isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final userBubbleBg =
+        isDark ? const Color(0xFF0284C7) : const Color(0xFF0066CC);
+    final aiBubbleBg =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+    final inputBgColor =
+        isDark ? const Color(0xFF020617) : const Color(0xFFF1F5F9);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -394,7 +411,8 @@ User Question: $text
                     color: const Color(0xFF0284C7).withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF0284C7), size: 22),
+                  child: const Icon(Icons.smart_toy_rounded,
+                      color: Color(0xFF0284C7), size: 22),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -402,8 +420,17 @@ User Question: $text
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Khatabook Ai', style: TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 13.5)),
-                      Text("online", style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 10), overflow: TextOverflow.ellipsis),
+                      Text('Khatabook Ai',
+                          style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13.5)),
+                      Text("online",
+                          style: const TextStyle(
+                              color: Color(0xFF10B981),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10),
+                          overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -417,7 +444,7 @@ User Question: $text
             ),
           ),
           Divider(color: borderColor, height: 1),
-          
+
           // Messages List
           Expanded(
             child: ListView.builder(
@@ -427,14 +454,17 @@ User Question: $text
               itemBuilder: (context, index) {
                 final msg = _messages[index];
                 return Align(
-                  alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     constraints: const BoxConstraints(maxWidth: 240),
                     decoration: BoxDecoration(
                       color: msg.isUser ? userBubbleBg : aiBubbleBg,
-                      border: msg.isUser ? null : Border.all(color: borderColor),
+                      border:
+                          msg.isUser ? null : Border.all(color: borderColor),
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(14),
                         topRight: const Radius.circular(14),
@@ -469,14 +499,18 @@ User Question: $text
                       height: 12,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                        color: isDark
+                            ? const Color(0xFF38BDF8)
+                            : const Color(0xFF0284C7),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'AI is typing...',
                       style: TextStyle(
-                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDark
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                         fontSize: 10.5,
                         fontWeight: FontWeight.bold,
                       ),
@@ -496,13 +530,21 @@ User Question: $text
                 Expanded(
                   child: TextField(
                     controller: _messageController,
-                    style: TextStyle(color: textColor, fontSize: 12.5, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: textColor,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600),
                     decoration: InputDecoration(
                       hintText: 'Ask about Khatabook Smart...',
-                      hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, fontSize: 11.5),
+                      hintStyle: TextStyle(
+                          color: isDark
+                              ? Colors.grey.shade500
+                              : Colors.grey.shade400,
+                          fontSize: 11.5),
                       filled: true,
                       fillColor: inputBgColor,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide.none,
@@ -513,7 +555,8 @@ User Question: $text
                 ),
                 const SizedBox(width: 6),
                 IconButton(
-                  icon: const Icon(Icons.send_rounded, color: Color(0xFF0284C7), size: 20),
+                  icon: const Icon(Icons.send_rounded,
+                      color: Color(0xFF0284C7), size: 20),
                   onPressed: _sendMessage,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
