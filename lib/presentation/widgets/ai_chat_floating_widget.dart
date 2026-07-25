@@ -31,8 +31,7 @@ class AiChatFloatingWidget extends ConsumerStatefulWidget {
 class _AiChatFloatingWidgetState extends ConsumerState<AiChatFloatingWidget>
     with SingleTickerProviderStateMixin {
   // 🔑 YOUR WORKING API KEY (X-goog-api-key)
-  static const String _geminiApiKey =
-      ""; //'AQ.Ab8RN6KpQPGbLz3QF4Y1rNWmYhYawSRgZtplZJn9MdCZAkRAHw';
+  static const String _geminiApiKey ='AQ.Ab8RN6Kl_syTzPmYzieu73So9eRGXOEnHu96fXxXaYV1exwl6Q';
 
   bool _isExpanded = false;
   bool _isLoading = false;

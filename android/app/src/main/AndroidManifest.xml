@@ -57,6 +57,16 @@
                 <action android:name="FLUTTER_NOTIFICATION_CLICK" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+
+            <!-- 🔐 Firebase Phone Auth Browser Redirect Intent Filter (OTP FIX) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="loginsetup-6f413.firebaseapp.com" />
+            </intent-filter>
             
         </activity>
         
