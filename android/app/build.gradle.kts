@@ -27,22 +27,20 @@ android {
         versionName = flutter.versionName
     }
 
-    // 🟢 १. Release Signing Config जोडा
+    // 🟢 1. आधी signingConfigs ब्लॉक असणे आवश्यक आहे
     signingConfigs {
         create("release") {
-            // जर तुम्ही .jks फाईल android/app/ फोल्डरमध्ये ठेवली असेल:
-            storeFile = file("my-release-key.jks") // तुमच्या .jks फाईलचे नाव
-            storePassword = "YOUR_STORE_PASSWORD"   // तुमचा Store Password
-            keyAlias = "YOUR_KEY_ALIAS"             // तुमचा Key Alias
-            keyPassword = "YOUR_KEY_PASSWORD"       // तुमचा Key Password
+            storeFile = file("my-release-key.jks")
+            storePassword = "123456"
+            keyAlias = "my-key-alias"
+            keyPassword = "123456"
         }
     }
 
+    // 🟢 2. मग buildTypes मध्ये signingConfig कॉल करा
     buildTypes {
-        release {
-            // 🟢 २. इथे "debug" ऐवजी "release" साइनिंग कॉन्फिग वापरा
+        getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            
             isMinifyEnabled = false
             isShrinkResources = false
         }

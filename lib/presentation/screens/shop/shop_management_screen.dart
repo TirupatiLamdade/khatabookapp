@@ -1,448 +1,22 @@
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:flutter/material.dart';
-// import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-// class ShopManagementScreen extends ConsumerStatefulWidget {
-//   const ShopManagementScreen({Key? key}) : super(key: key);
-
-//   @override
-//   ConsumerState<ShopManagementScreen> createState() => _ShopManagementScreenState();
-// }
-
-// class _ShopManagementScreenState extends ConsumerState<ShopManagementScreen> {
-//   final User? currentUser = FirebaseAuth.instance.currentUser;
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final double screenWidth = MediaQuery.of(context).size.width;
-//     final bool isTabletOrWeb = screenWidth > 600;
-
-//     return Scaffold(
-//       backgroundColor: const Color(0xFF0F172A), // Dark Blue App Theme
-//       appBar: AppBar(
-//         backgroundColor: const Color(0xFF1E293B),
-//         title: const Text("My Shops Management", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-//         centerTitle: true,
-//         elevation: 0,
-//       ),
-//       body: StreamBuilder<QuerySnapshot>(
-//         // 📡 'users' मधील सर्व दुकाने फेच करणे
-//         stream: FirebaseFirestore.instance.collection('users').snapshots(),
-//         builder: (context, snapshot) {
-//           if (snapshot.connectionState == ConnectionState.waiting) {
-//             return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
-//           }
-
-//           if (snapshot.hasError) {
-//             return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.redAccent)));
-//           }
-
-//           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-//             return _buildNoShopsFound();
-//           }
-
-//           final allUserDocs = snapshot.data!.docs;
-
-//           return Center(
-//             child: ConstrainedBox(
-//               constraints: const BoxConstraints(maxWidth: 850),
-//               child: ListView.builder(
-//                 padding: EdgeInsets.symmetric(horizontal: isTabletOrWeb ? 24 : 12, vertical: 16),
-//                 itemCount: allUserDocs.length,
-//                 itemBuilder: (context, index) {
-//                   final shopData = allUserDocs[index].data() as Map<String, dynamic>;
-//                   final String shopId = allUserDocs[index].id;
-
-//                   // 🟢 Active status चेक करणे
-//                   final bool isActive = shopData['isActive'] == true;
-
-//                   return _buildShopCard(
-//                     context: context,
-//                     shopId: shopId,
-//                     shopData: shopData,
-//                     isActive: isActive,
-//                     isTabletOrWeb: isTabletOrWeb,
-//                   );
-//                 },
-//               ),
-//             ),
-//           );
-//         },
-//       ),
-//     );
-//   }
-
-//   // 🎴 Responsive Shop Item Card
-//   Widget _buildShopCard({
-//     required BuildContext context,
-//     required String shopId,
-//     required Map<String, dynamic> shopData,
-//     required bool isActive,
-//     required bool isTabletOrWeb,
-//   }) {
-//     final String shopName = shopData['shopName'] ?? shopData['name'] ?? 'Shop';
-//     final String ownerName = shopData['ownerName'] ?? 'Owner';
-//     final String address = shopData['shopAddress'] ?? shopData['address'] ?? 'No Address';
-//     final String phone = shopData['phone'] ?? shopData['ownerPhone'] ?? 'No Phone';
-//     final String shopEmail = shopData['email'] ?? shopData['ownerEmail'] ?? 'No Email';
-
-//     return Card(
-//       color: const Color(0xFF1E293B), // Dark Card Background
-//       margin: const EdgeInsets.only(bottom: 16),
-//       shape: RoundedRectangleBorder(
-//         borderRadius: BorderRadius.circular(16),
-//         side: BorderSide(
-//           color: isActive ? Colors.greenAccent : Colors.grey.shade800,
-//           width: isActive ? 2 : 1,
-//         ),
-//       ),
-//       elevation: isActive ? 6 : 2,
-//       child: Padding(
-//         padding: EdgeInsets.all(isTabletOrWeb ? 20.0 : 16.0),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             Row(
-//               children: [
-//                 CircleAvatar(
-//                   radius: isTabletOrWeb ? 28 : 22,
-//                   backgroundColor: Colors.blue.withOpacity(0.2),
-//                   child: Icon(Icons.storefront_rounded, color: Colors.blueAccent, size: isTabletOrWeb ? 30 : 24),
-//                 ),
-//                 const SizedBox(width: 12),
-//                 Expanded(
-//                   child: Column(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         shopName,
-//                         style: TextStyle(
-//                           fontWeight: FontWeight.bold,
-//                           fontSize: isTabletOrWeb ? 18 : 16,
-//                           color: Colors.white,
-//                         ),
-//                       ),
-//                       const SizedBox(height: 2),
-//                       Text("Owner: $ownerName", style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-//                     ],
-//                   ),
-//                 ),
-//                 if (isActive)
-//                   Container(
-//                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-//                     decoration: BoxDecoration(color: Colors.green.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
-//                     child: const Text("ACTIVE", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 10)),
-//                   ),
-//               ],
-//             ),
-//             const Divider(height: 24, color: Colors.white10),
-//             Row(children: [
-//               const Icon(Icons.phone_android_outlined, size: 16, color: Colors.grey),
-//               const SizedBox(width: 8),
-//               Text(phone, style: const TextStyle(fontSize: 13, color: Colors.white70)),
-//             ]),
-//             const SizedBox(height: 6),
-//             Row(children: [
-//               const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
-//               const SizedBox(width: 8),
-//               Expanded(child: Text(address, style: const TextStyle(fontSize: 13, color: Colors.white70))),
-//             ]),
-//             const SizedBox(height: 16),
-//             Row(
-//               children: [
-//                 if (!isActive)
-//                   Expanded(
-//                     child: ElevatedButton.icon(
-//                       style: ElevatedButton.styleFrom(
-//                         backgroundColor: Colors.blueAccent,
-//                         padding: const EdgeInsets.symmetric(vertical: 12),
-//                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-//                       ),
-//                       icon: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 18),
-//                       label: const Text("Switch to Shop", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-//                       onPressed: () => _showProfessionalSwitchDialog(shopId, shopName),
-//                     ),
-//                   )
-//                 else
-//                   const Expanded(
-//                     child: Text("Currently in use", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
-//                   ),
-//                 const SizedBox(width: 8),
-//                 IconButton(
-//                   icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent),
-//                   onPressed: () => _showPermanentDeleteDialog(shopId, shopName, shopEmail),
-//                 ),
-//               ],
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   // 💼 PROFESSIONAL SWITCH DIALOG WITH CHECKBOX
-//   void _showProfessionalSwitchDialog(String shopId, String shopName) {
-//     bool isConfirmed = false;
-
-//     showDialog(
-//       context: context,
-//       builder: (context) {
-//         return StatefulBuilder(
-//           builder: (context, setDialogState) {
-//             return AlertDialog(
-//               backgroundColor: const Color(0xFF1E293B),
-//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-//               title: const Row(
-//                 children: [
-//                   Icon(Icons.published_with_changes_rounded, color: Colors.blueAccent),
-//                   SizedBox(width: 8),
-//                   Text("Confirm Shop Switch", style: TextStyle(color: Colors.white, fontSize: 18)),
-//                 ],
-//               ),
-//               content: Column(
-//                 mainAxisSize: MainAxisSize.min,
-//                 crossAxisAlignment: CrossAxisAlignment.start,
-//                 children: [
-//                   Text(
-//                     "You are switching context to '$shopName'. All customer records, ledgers, and reports will update globally.",
-//                     style: TextStyle(color: Colors.grey.shade300, fontSize: 13),
-//                   ),
-//                   const SizedBox(height: 12),
-//                   CheckboxListTile(
-//                     value: isConfirmed,
-//                     activeColor: Colors.blueAccent,
-//                     contentPadding: EdgeInsets.zero,
-//                     title: const Text(
-//                       "I confirm to switch workspace to this shop.",
-//                       style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
-//                     ),
-//                     onChanged: (val) => setDialogState(() => isConfirmed = val ?? false),
-//                   ),
-//                 ],
-//               ),
-//               actions: [
-//                 TextButton(
-//                   onPressed: () => Navigator.pop(context),
-//                   child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-//                 ),
-//                 ElevatedButton(
-//                   style: ElevatedButton.styleFrom(
-//                     backgroundColor: Colors.blueAccent,
-//                     disabledBackgroundColor: Colors.grey.shade800,
-//                   ),
-//                   onPressed: isConfirmed
-//                       ? () {
-//                           Navigator.pop(context);
-//                           _executeShopSwitch(shopId, shopName);
-//                         }
-//                       : null,
-//                   child: const Text("Switch Context", style: TextStyle(color: Colors.white)),
-//                 ),
-//               ],
-//             );
-//           },
-//         );
-//       },
-//     );
-//   }
-
-//   // 🟦 BLUE SPLASH TRANSITION & FIRESTORE BATCH UPDATE
-//   void _executeShopSwitch(String selectedShopId, String shopName) async {
-//     try {
-//       // 1. 🔥 Firestore मध्ये Atomic Batch म्‍हाणून सर्व Shops चा Status बदलणे
-//       final batch = FirebaseFirestore.instance.batch();
-//       final allDocs = await FirebaseFirestore.instance.collection('users').get();
-
-//       for (var doc in allDocs.docs) {
-//         batch.update(doc.reference, {'isActive': doc.id == selectedShopId});
-//       }
-//       await batch.commit();
-//     } catch (e) {
-//       debugPrint("Error updating shop context: $e");
-//     }
-
-//     if (!mounted) return;
-
-//     // 2. ⏳ 3-Second Dark Blue Splash Loader (Matching App UI)
-//     showDialog(
-//       context: context,
-//       barrierDismissible: false,
-//       builder: (context) => Scaffold(
-//         backgroundColor: const Color(0xFF0F172A),
-//         body: Center(
-//           child: Column(
-//             mainAxisAlignment: MainAxisAlignment.center,
-//             children: [
-//               const CircularProgressIndicator(color: Colors.blueAccent),
-//               const SizedBox(height: 24),
-//               Text(
-//                 "Switching Context to $shopName...",
-//                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-//               ),
-//               const SizedBox(height: 8),
-//               const Text(
-//                 "Updating ledgers, authorization, and customer data...",
-//                 style: TextStyle(color: Colors.white70, fontSize: 13),
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-
-//     // 3. 🚀 ३ सेकंदांनंतर होम पेजवर रिडायरेक्ट करणे (इथे संपूर्ण डेटा ऑटोमॅटिक रीलोड होईल)
-//     Future.delayed(const Duration(seconds: 3), () {
-//       if (mounted) {
-//         Navigator.pop(context);
-//         Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
-//       }
-//     });
-//   }
-
-//   // 🗑️ PERMANENT DELETE DIALOG WITH CHECKBOX
-//   void _showPermanentDeleteDialog(String shopId, String shopName, String registeredEmail) {
-//     bool isAgreed = false;
-//     final emailController = TextEditingController(text: registeredEmail);
-//     final passwordController = TextEditingController();
-//     bool isVerifying = false;
-
-//     showDialog(
-//       context: context,
-//       builder: (context) {
-//         return StatefulBuilder(
-//           builder: (context, setDialogState) {
-//             return AlertDialog(
-//               backgroundColor: const Color(0xFF1E293B),
-//               title: const Row(
-//                 children: [
-//                   Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-//                   SizedBox(width: 8),
-//                   Text("Delete Shop", style: TextStyle(color: Colors.white)),
-//                 ],
-//               ),
-//               content: SingleChildScrollView(
-//                 child: Column(
-//                   mainAxisSize: MainAxisSize.min,
-//                   children: [
-//                     Text(
-//                       "Are you sure you want to PERMANENTLY delete '$shopName'?",
-//                       style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
-//                     ),
-//                     const SizedBox(height: 12),
-//                     CheckboxListTile(
-//                       value: isAgreed,
-//                       activeColor: Colors.redAccent,
-//                       contentPadding: EdgeInsets.zero,
-//                       title: const Text("I agree to permanently delete this shop and data.", style: TextStyle(fontSize: 12, color: Colors.white70)),
-//                       onChanged: (val) => setDialogState(() => isAgreed = val ?? false),
-//                     ),
-//                     if (isAgreed) ...[
-//                       const SizedBox(height: 8),
-//                       TextField(
-//                         controller: emailController,
-//                         style: const TextStyle(color: Colors.white),
-//                         decoration: const InputDecoration(labelText: "Email", labelStyle: TextStyle(color: Colors.grey), border: OutlineInputBorder(), isDense: true),
-//                       ),
-//                       const SizedBox(height: 10),
-//                       TextField(
-//                         controller: passwordController,
-//                         obscureText: true,
-//                         style: const TextStyle(color: Colors.white),
-//                         decoration: const InputDecoration(labelText: "Password", labelStyle: TextStyle(color: Colors.grey), border: OutlineInputBorder(), isDense: true),
-//                       ),
-//                     ]
-//                   ],
-//                 ),
-//               ),
-//               actions: [
-//                 TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel", style: TextStyle(color: Colors.grey))),
-//                 ElevatedButton(
-//                   style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-//                   onPressed: (isAgreed && !isVerifying)
-//                       ? () async {
-//                           setDialogState(() => isVerifying = true);
-//                           await _verifyAndDelete(
-//                             context: context,
-//                             shopId: shopId,
-//                             shopName: shopName,
-//                             email: emailController.text.trim(),
-//                             password: passwordController.text.trim(),
-//                           );
-//                           setDialogState(() => isVerifying = false);
-//                         }
-//                       : null,
-//                   child: isVerifying
-//                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-//                       : const Text("Verify & Delete", style: TextStyle(color: Colors.white)),
-//                 ),
-//               ],
-//             );
-//           },
-//         );
-//       },
-//     );
-//   }
-
-//   Future<void> _verifyAndDelete({
-//     required BuildContext context,
-//     required String shopId,
-//     required String shopName,
-//     required String email,
-//     required String password,
-//   }) async {
-//     try {
-//       if (email.isNotEmpty && password.isNotEmpty) {
-//         AuthCredential credential = EmailAuthProvider.credential(email: email, password: password);
-//         await FirebaseAuth.instance.currentUser?.reauthenticateWithCredential(credential);
-//         await FirebaseAuth.instance.currentUser?.sendEmailVerification();
-//       }
-
-//       await FirebaseFirestore.instance.collection('users').doc(shopId).delete();
-
-//       if (!mounted) return;
-//       Navigator.pop(context);
-
-//       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("'$shopName' deleted successfully!")));
-//     } catch (e) {
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.redAccent, content: Text("Authentication Failed! Check credentials.")));
-//     }
-//   }
-
-//   Widget _buildNoShopsFound() {
-//     return Center(
-//       child: Column(
-//         mainAxisAlignment: MainAxisAlignment.center,
-//         children: [
-//           Icon(Icons.storefront_outlined, size: 64, color: Colors.grey.shade600),
-//           const SizedBox(height: 12),
-//           const Text("No shops found in database.", style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
-//         ],
-//       ),
-//     );
-//   }
-// }
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/providers/global_provider_hub.dart';
 
-class ShopManagementScreen extends ConsumerStatefulWidget {
+class ShopManagementScreen extends ConsumerWidget {
   const ShopManagementScreen({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<ShopManagementScreen> createState() => _ShopManagementScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 🎨 Dynamic Theme Mode Watcher
+    final currentTheme = ref.watch(themeModeProvider);
+    final bool isDark = currentTheme == ThemeMode.dark ||
+        (currentTheme == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
 
-class _ShopManagementScreenState extends ConsumerState<ShopManagementScreen> {
-  final User? currentUser = FirebaseAuth.instance.currentUser;
-
-  @override
-  Widget build(BuildContext context) {
-    // 🎨 Dynamic Theme Detection (Syncs with Settings toggle)
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color bgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final Color cardBgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
     final Color appBarBgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
@@ -450,8 +24,19 @@ class _ShopManagementScreenState extends ConsumerState<ShopManagementScreen> {
     final Color subTextColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
     final Color borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
 
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final bool isTabletOrWeb = screenWidth > 600;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final dynamic activeShopState = ref.watch(activeShopIdProvider);
+
+    String? activeShopId;
+    if (activeShopState is AsyncValue) {
+      activeShopId = activeShopState.asData?.value as String?;
+    } else if (activeShopState is String?) {
+      activeShopId = activeShopState;
+    }
+
+    final String targetShopId = (activeShopId != null && activeShopId.isNotEmpty)
+        ? activeShopId
+        : (currentUser?.uid ?? '');
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -461,293 +46,607 @@ class _ShopManagementScreenState extends ConsumerState<ShopManagementScreen> {
         centerTitle: true,
         iconTheme: IconThemeData(color: textColor),
         title: Text(
-          "My Shops Management",
-          style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+          "Current Shop Dashboard",
+          style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 18),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        // 📡 Stream all users/shops
-        stream: FirebaseFirestore.instance.collection('users').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.blueAccent),
-            );
-          }
-
-          if (snapshot.hasError) {
-            return Center(
+      body: targetShopId.isEmpty
+          ? Center(
               child: Text(
-                "Error: ${snapshot.error}",
-                style: const TextStyle(color: Colors.redAccent),
+                "Please login to access real shop details",
+                style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
               ),
-            );
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return _buildNoShopsFound(textColor, subTextColor);
-          }
-
-          final allUserDocs = snapshot.data!.docs;
-
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 850),
-              child: ListView.builder(
-                // 🟢 Extra bottom padding (140px) prevents floating widgets from blocking cards
-                padding: EdgeInsets.only(
-                  left: isTabletOrWeb ? 24 : 12,
-                  right: isTabletOrWeb ? 24 : 12,
-                  top: 16,
-                  bottom: 140,
-                ),
-                itemCount: allUserDocs.length,
-                itemBuilder: (context, index) {
-                  final shopData = allUserDocs[index].data() as Map<String, dynamic>;
-                  final String shopId = allUserDocs[index].id;
-                  final bool isActive = shopData['isActive'] == true;
-
-                  return _buildShopCard(
-                    context: context,
-                    shopId: shopId,
-                    shopData: shopData,
-                    isActive: isActive,
-                    isTabletOrWeb: isTabletOrWeb,
+            )
+          : SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 140),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: _SingleActiveShopPanel(
+                    shopId: targetShopId,
                     isDark: isDark,
                     cardBgColor: cardBgColor,
                     textColor: textColor,
                     subTextColor: subTextColor,
                     borderColor: borderColor,
-                  );
-                },
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // 🎴 Responsive Shop Item Card with Dynamic Theme Support
-  Widget _buildShopCard({
-    required BuildContext context,
-    required String shopId,
-    required Map<String, dynamic> shopData,
-    required bool isActive,
-    required bool isTabletOrWeb,
-    required bool isDark,
-    required Color cardBgColor,
-    required Color textColor,
-    required Color subTextColor,
-    required Color borderColor,
-  }) {
-    final String shopName = shopData['shopName'] ?? shopData['name'] ?? 'Shop';
-    final String ownerName = shopData['ownerName'] ?? 'Owner';
-    final String address = shopData['shopAddress'] ?? shopData['address'] ?? 'No Address';
-    final String phone = shopData['phone'] ?? shopData['ownerPhone'] ?? 'No Phone';
-    final String shopEmail = shopData['email'] ?? shopData['ownerEmail'] ?? 'No Email';
-
-    return Card(
-      color: cardBgColor,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: isActive ? Colors.greenAccent : borderColor,
-          width: isActive ? 2 : 1,
-        ),
-      ),
-      elevation: isActive ? 4 : (isDark ? 2 : 1),
-      child: Padding(
-        padding: EdgeInsets.all(isTabletOrWeb ? 20.0 : 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: isTabletOrWeb ? 28 : 22,
-                  backgroundColor: Colors.blue.withOpacity(0.15),
-                  child: Icon(
-                    Icons.storefront_rounded,
-                    color: Colors.blueAccent,
-                    size: isTabletOrWeb ? 30 : 24,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+              ),
+            ),
+    );
+  }
+}
+
+class _SingleActiveShopPanel extends StatelessWidget {
+  final String shopId;
+  final bool isDark;
+  final Color cardBgColor;
+  final Color textColor;
+  final Color subTextColor;
+  final Color borderColor;
+
+  const _SingleActiveShopPanel({
+    Key? key,
+    required this.shopId,
+    required this.isDark,
+    required this.cardBgColor,
+    required this.textColor,
+    required this.subTextColor,
+    required this.borderColor,
+  }) : super(key: key);
+
+  // 🗺️ Google Maps Directions Launcher
+  Future<void> _launchGoogleMaps(BuildContext context, String address) async {
+    if (address.trim().isEmpty || address == 'No Address Listed') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No valid address available for navigation!')),
+      );
+      return;
+    }
+    final Uri googleMapsUrl = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address.trim())}&travelmode=driving',
+    );
+
+    try {
+      if (await canLaunchUrl(googleMapsUrl)) {
+        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open Google Maps!')),
+          );
+        }
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to launch route directions.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('shops').doc(shopId).snapshots(),
+      builder: (context, shopSnap) {
+        if (shopSnap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
+        }
+
+        Map<String, dynamic> shopData = {};
+        if (shopSnap.hasData && shopSnap.data!.exists && shopSnap.data!.data() != null) {
+          shopData = shopSnap.data!.data() as Map<String, dynamic>;
+        }
+
+        return FutureBuilder<DocumentSnapshot>(
+          future: shopData.isEmpty
+              ? FirebaseFirestore.instance.collection('users').doc(shopId).get()
+              : Future.value(null),
+          builder: (context, userSnap) {
+            Map<String, dynamic> userData = {};
+            if (userSnap.hasData && userSnap.data != null && userSnap.data!.exists) {
+              userData = userSnap.data!.data() as Map<String, dynamic>;
+            }
+
+            final String realShopName = shopData['shopName'] ?? shopData['name'] ?? userData['shopName'] ?? 'My Business Shop';
+            
+            String realOwnerName = 'Shop Owner';
+            if (shopData['ownerName'] != null && shopData['ownerName'].toString().trim().isNotEmpty) {
+              realOwnerName = shopData['ownerName'];
+            } else if (shopData['owner'] != null && shopData['owner'].toString().trim().isNotEmpty) {
+              realOwnerName = shopData['owner'];
+            } else if (userData['ownerName'] != null && userData['ownerName'].toString().trim().isNotEmpty) {
+              realOwnerName = userData['ownerName'];
+            } else if (userData['name'] != null && userData['name'].toString().trim().isNotEmpty) {
+              realOwnerName = userData['name'];
+            } else if (currentUser?.displayName != null && currentUser!.displayName!.isNotEmpty) {
+              realOwnerName = currentUser.displayName!;
+            }
+
+            final String realAddress = shopData['address'] ?? shopData['shopAddress'] ?? userData['address'] ?? 'No Address Listed';
+            final String realCategory = shopData['category'] ?? userData['category'] ?? 'General Business';
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1️⃣ ACTIVE SHOP HEADER CARD
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                          : [const Color(0xFF0066CC), const Color(0xFF0284C7)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        shopName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: isTabletOrWeb ? 18 : 16,
-                          color: textColor,
-                        ),
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Colors.white24,
+                            child: Icon(Icons.storefront_rounded, color: Colors.white, size: 28),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  realShopName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Owner: $realOwnerName | $realCategory',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        "Owner: $ownerName",
-                        style: TextStyle(color: subTextColor, fontSize: 12),
-                      ),
+                      const SizedBox(height: 16),
+                      const Divider(color: Colors.white24, height: 1),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.location_on_rounded, color: Colors.amber, size: 16),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    realAddress,
+                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF10B981)),
+                            ),
+                            child: const Text(
+                              'LOGGED IN SHOP',
+                              style: TextStyle(color: Color(0xFF10B981), fontSize: 9.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      )
                     ],
                   ),
                 ),
-                if (isActive)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+
+                const SizedBox(height: 24),
+
+                // 2️⃣ 📊 LIVE ANALYTICS STREAM
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('customers')
+                      .where('operatorUid', isEqualTo: currentUser?.uid)
+                      .snapshots(),
+                  builder: (context, custSnap) {
+                    if (!custSnap.hasData) {
+                      return const Center(child: CircularProgressIndicator(color: Colors.blueAccent));
+                    }
+
+                    final custDocs = custSnap.data!.docs;
+                    int totalCustomers = custDocs.length;
+                    int activeCustomersCount = 0;
+                    int recoveredCustomersCount = 0;
+
+                    double totalUdhari = 0.0;
+                    double maxUdhari = 0.0;
+                    String highestUdhariCustName = "None";
+
+                    double minUdhari = double.infinity;
+                    String lowestUdhariCustName = "None";
+
+                    for (var doc in custDocs) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final name = data['name'] ?? 'Customer';
+                      bool isArchived = data['isArchived'] ?? false;
+                      double balance = double.tryParse(data['balance']?.toString() ?? '0.0') ?? 0.0;
+
+                      if (isArchived) {
+                        recoveredCustomersCount++;
+                      } else {
+                        activeCustomersCount++;
+                      }
+
+                      if (balance > 0) {
+                        totalUdhari += balance;
+
+                        if (balance > maxUdhari) {
+                          maxUdhari = balance;
+                          highestUdhariCustName = name;
+                        }
+                        if (balance < minUdhari) {
+                          minUdhari = balance;
+                          lowestUdhariCustName = name;
+                        }
+                      }
+                    }
+
+                    if (minUdhari == double.infinity) minUdhari = 0.0;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: Colors.greenAccent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          "ACTIVE",
+                        // COUNTS OVERVIEW
+                        Text(
+                          "CUSTOMER ACCOUNTS & RECOVERY OVERVIEW",
                           style: TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
+                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0066CC),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 11,
+                            letterSpacing: 1.0,
                           ),
                         ),
+                        const SizedBox(height: 12),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildCountTile(
+                                title: "Total Accounts",
+                                count: "$totalCustomers",
+                                icon: Icons.groups_rounded,
+                                color: const Color(0xFF38BDF8),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildCountTile(
+                                title: "Active Accounts",
+                                count: "$activeCustomersCount",
+                                icon: Icons.check_circle_rounded,
+                                color: const Color(0xFF10B981),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildCountTile(
+                                title: "Recovered / Archive",
+                                count: "$recoveredCustomersCount",
+                                icon: Icons.archive_rounded,
+                                color: Colors.amber,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // UDHARI GRAPHICS
+                        Text(
+                          "CUSTOMER UDHARI GRAPHICS & HIGHLIGHTS",
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0066CC),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 11,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: cardBgColor,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: borderColor, width: 1.5),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Total Udhari Balance",
+                                    style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    "₹${totalUdhari.toStringAsFixed(2)}",
+                                    style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w900, fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Row(
+                                            children: [
+                                              Icon(Icons.arrow_circle_up_rounded, color: Color(0xFFEF4444), size: 16),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                "Highest Udhari",
+                                                style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            highestUdhariCustName,
+                                            style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            "₹${maxUdhari.toStringAsFixed(2)}",
+                                            style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w900, fontSize: 14),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Row(
+                                            children: [
+                                              Icon(Icons.arrow_circle_down_rounded, color: Color(0xFF10B981), size: 16),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                "Lowest / Clear",
+                                                style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            lowestUdhariCustName,
+                                            style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            "₹${minUdhari.toStringAsFixed(2)}",
+                                            style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w900, fontSize: 14),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 14),
+
+                              Text(
+                                "Highest Udhari Ratio",
+                                style: TextStyle(color: subTextColor, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: LinearProgressIndicator(
+                                  value: totalUdhari > 0 ? (maxUdhari / totalUdhari).clamp(0.05, 1.0) : 0.0,
+                                  backgroundColor: borderColor,
+                                  color: const Color(0xFFEF4444),
+                                  minHeight: 8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // 3️⃣ 📍 LIVE CUSTOMER MAP & ADDRESS LIST (REAL-TIME UPDATES)
+                        Text(
+                          "CUSTOMER LIVE LOCATION MAPS & ADDRESSES",
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0066CC),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 11,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (custDocs.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: cardBgColor,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Center(
+                              child: Text(
+                                "No registered customer locations found for this shop.",
+                                style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          )
+                        else
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: custDocs.length,
+                            itemBuilder: (context, idx) {
+                              final cData = custDocs[idx].data() as Map<String, dynamic>;
+                              final String cName = cData['name'] ?? 'Customer';
+                              final String cPhone = cData['phone'] ?? 'N/A';
+                              final String cAddress = (cData['address'] ?? '').toString().trim().isNotEmpty
+                                  ? cData['address']
+                                  : 'No Address Listed';
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: cardBgColor,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: borderColor, width: 1.2),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // 🟢 Contact Circle Avatar with Customer Name Initial
+                                    CircleAvatar(
+                                      radius: 20,
+                                      backgroundColor: const Color(0xFF38BDF8).withOpacity(0.15),
+                                      child: Text(
+                                        cName.isNotEmpty ? cName[0].toUpperCase() : 'C',
+                                        style: const TextStyle(
+                                          color: Color(0xFF38BDF8),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+
+                                    // 🟢 Live Name, Phone & Address
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            cName,
+                                            style: TextStyle(
+                                              color: textColor,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.phone_android_rounded, size: 12, color: subTextColor),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                "+91 $cPhone",
+                                                style: TextStyle(color: subTextColor, fontSize: 11, fontWeight: FontWeight.w600),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.location_on_rounded, size: 12, color: Color(0xFFEF4444)),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  cAddress,
+                                                  style: TextStyle(
+                                                    color: textColor.withOpacity(0.85),
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 8),
+
+                                    // 🗺️ Interactive Live Route Map Circle Button
+                                    InkWell(
+                                      onTap: () => _launchGoogleMaps(context, cAddress),
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF38BDF8).withOpacity(0.15),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                                        ),
+                                        child: const Icon(
+                                          Icons.map_rounded,
+                                          color: Color(0xFF38BDF8),
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                       ],
-                    ),
-                  ),
-              ],
-            ),
-            Divider(height: 24, color: borderColor),
-            Row(
-              children: [
-                Icon(Icons.phone_android_outlined, size: 16, color: subTextColor),
-                const SizedBox(width: 8),
-                Text(phone, style: TextStyle(fontSize: 13, color: textColor)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(Icons.location_on_outlined, size: 16, color: subTextColor),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(address, style: TextStyle(fontSize: 13, color: textColor)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                if (!isActive)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 18),
-                      label: const Text(
-                        "Switch to Shop",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () => _showProfessionalSwitchDialog(shopId, shopName, isDark, cardBgColor, textColor, subTextColor),
-                    ),
-                  )
-                else
-                  const Expanded(
-                    child: Text(
-                      "Currently in use",
-                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent),
-                  onPressed: () => _showPermanentDeleteDialog(shopId, shopName, shopEmail, isDark, cardBgColor, textColor),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 💼 PROFESSIONAL SWITCH DIALOG WITH CHECKBOX
-  void _showProfessionalSwitchDialog(
-    String shopId,
-    String shopName,
-    bool isDark,
-    Color cardBgColor,
-    Color textColor,
-    Color subTextColor,
-  ) {
-    bool isConfirmed = false;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: cardBgColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Row(
-                children: [
-                  const Icon(Icons.published_with_changes_rounded, color: Colors.blueAccent),
-                  const SizedBox(width: 8),
-                  Text("Confirm Shop Switch", style: TextStyle(color: textColor, fontSize: 18)),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "You are switching context to '$shopName'. All customer records, ledgers, and reports will update globally.",
-                    style: TextStyle(color: subTextColor, fontSize: 13),
-                  ),
-                  const SizedBox(height: 12),
-                  CheckboxListTile(
-                    value: isConfirmed,
-                    activeColor: Colors.blueAccent,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      "I confirm to switch workspace to this shop.",
-                      style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                    onChanged: (val) => setDialogState(() => isConfirmed = val ?? false),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text("Cancel", style: TextStyle(color: subTextColor)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    disabledBackgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
-                  ),
-                  onPressed: isConfirmed
-                      ? () {
-                          Navigator.pop(context);
-                          _executeShopSwitch(shopId, shopName);
-                        }
-                      : null,
-                  child: const Text("Switch Context", style: TextStyle(color: Colors.white)),
+                    );
+                  },
                 ),
               ],
             );
@@ -757,217 +656,34 @@ class _ShopManagementScreenState extends ConsumerState<ShopManagementScreen> {
     );
   }
 
-  // 🟦 SPLASH TRANSITION & FIRESTORE BATCH UPDATE
-  void _executeShopSwitch(String selectedShopId, String shopName) async {
-    try {
-      final batch = FirebaseFirestore.instance.batch();
-      final allDocs = await FirebaseFirestore.instance.collection('users').get();
-
-      for (var doc in allDocs.docs) {
-        batch.update(doc.reference, {'isActive': doc.id == selectedShopId});
-      }
-      await batch.commit();
-    } catch (e) {
-      debugPrint("Error updating shop context: $e");
-    }
-
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Scaffold(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF0F172A)
-            : const Color(0xFFF8FAFC),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(color: Colors.blueAccent),
-              const SizedBox(height: 24),
-              Text(
-                "Switching Context to $shopName...",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black54,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "Updating ledgers, authorization, and customer data...",
-                style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget _buildCountTile({
+    required String title,
+    required String count,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: cardBgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1.5),
       ),
-    );
-
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pop(context);
-        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
-      }
-    });
-  }
-
-  // 🗑️ PERMANENT DELETE DIALOG WITH CHECKBOX
-  void _showPermanentDeleteDialog(
-    String shopId,
-    String shopName,
-    String registeredEmail,
-    bool isDark,
-    Color cardBgColor,
-    Color textColor,
-  ) {
-    bool isAgreed = false;
-    final emailController = TextEditingController(text: registeredEmail);
-    final passwordController = TextEditingController();
-    bool isVerifying = false;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: cardBgColor,
-              title: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-                  const SizedBox(width: 8),
-                  Text("Delete Shop", style: TextStyle(color: textColor)),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "Are you sure you want to PERMANENTLY delete '$shopName'?",
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    CheckboxListTile(
-                      value: isAgreed,
-                      activeColor: Colors.redAccent,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        "I agree to permanently delete this shop and data.",
-                        style: TextStyle(fontSize: 12, color: textColor.withOpacity(0.8)),
-                      ),
-                      onChanged: (val) => setDialogState(() => isAgreed = val ?? false),
-                    ),
-                    if (isAgreed) ...[
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: emailController,
-                        style: TextStyle(color: textColor),
-                        decoration: InputDecoration(
-                          labelText: "Email",
-                          labelStyle: TextStyle(color: textColor.withOpacity(0.6)),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: passwordController,
-                        obscureText: true,
-                        style: TextStyle(color: textColor),
-                        decoration: InputDecoration(
-                          labelText: "Password",
-                          labelStyle: TextStyle(color: textColor.withOpacity(0.6)),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                    ]
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text("Cancel", style: TextStyle(color: textColor.withOpacity(0.6))),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                  onPressed: (isAgreed && !isVerifying)
-                      ? () async {
-                          setDialogState(() => isVerifying = true);
-                          await _verifyAndDelete(
-                            context: context,
-                            shopId: shopId,
-                            shopName: shopName,
-                            email: emailController.text.trim(),
-                            password: passwordController.text.trim(),
-                          );
-                          setDialogState(() => isVerifying = false);
-                        }
-                      : null,
-                  child: isVerifying
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text("Verify & Delete", style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _verifyAndDelete({
-    required BuildContext context,
-    required String shopId,
-    required String shopName,
-    required String email,
-    required String password,
-  }) async {
-    try {
-      if (email.isNotEmpty && password.isNotEmpty) {
-        AuthCredential credential = EmailAuthProvider.credential(email: email, password: password);
-        await FirebaseAuth.instance.currentUser?.reauthenticateWithCredential(credential);
-        await FirebaseAuth.instance.currentUser?.sendEmailVerification();
-      }
-
-      await FirebaseFirestore.instance.collection('users').doc(shopId).delete();
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("'$shopName' deleted successfully!")));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.redAccent,
-          content: Text("Authentication Failed! Check credentials."),
-        ),
-      );
-    }
-  }
-
-  Widget _buildNoShopsFound(Color textColor, Color subTextColor) {
-    return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.storefront_outlined, size: 64, color: subTextColor),
-          const SizedBox(height: 12),
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 6),
           Text(
-            "No shops found in database.",
-            style: TextStyle(fontSize: 16, color: textColor, fontWeight: FontWeight.bold),
+            count,
+            style: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: TextStyle(color: subTextColor, fontSize: 10, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

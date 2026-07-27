@@ -12,6 +12,8 @@
     <!-- 🔔 Notification & Device Control Permissions -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- 🟢 Android 13+ (API level 33) साठी Notification Permission -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <!-- 🔗 External App & URL Launch Queries (Android 11+ Compatibility) -->
     <queries>
