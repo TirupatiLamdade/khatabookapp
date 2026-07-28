@@ -118,7 +118,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       _loadingProgress = 0.0;
     });
 
-    // ⏱️ ३ सेकंदांसाठी ३० स्टेप्स (प्रत्येक स्टेप १००ms) = ३०००ms
     const int totalSteps = 30;
     int currentStep = 0;
 
@@ -148,7 +147,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       backgroundColor: const Color(0xFF070A0F),
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: _triggerProfessionalOnboardingFlow, // Screen Tap Trigger (Button Removed)
+        onTap: _triggerProfessionalOnboardingFlow,
         child: Stack(
           children: [
             // 🖤 1. DARK CONCRETE STUDIO SPOTLIGHT BACKGROUND
@@ -188,7 +187,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                     opacity: _fadeAnimation.value,
                     child: Center(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
                         child: Flex(
                           direction: isDesktop ? Axis.horizontal : Axis.vertical,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -197,16 +196,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                             // 🏪 A. LIVE KHATABOOK APP ECOSYSTEM HUB
                             Container(
                               width: isDesktop ? size.width * 0.52 : double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
                               child: _buildSeamlessShopEcosystem(isDesktop),
                             ),
                             
-                            if (isDesktop) const SizedBox(width: 56) else const SizedBox(height: 40),
+                            if (isDesktop) const SizedBox(width: 56) else const SizedBox(height: 32),
 
                             // 🎴 B. WELCOME CONFIGURATION TERMINAL CARD
                             Container(
                               width: isDesktop ? 390 : double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
                               child: _buildSeamlessWelcomeForm(context),
                             ),
                           ],
@@ -244,30 +243,42 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               child: const Icon(Icons.menu_book_rounded, size: 28, color: Color(0xFF38BDF8)),
             ),
             const SizedBox(width: 14),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Khatabook App',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
-                ),
-                Text(
-                  'Smart Digital Ledger Engine',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.bold),
-                ),
-              ],
+            const Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Khatabook App',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+                    ),
+                  ),
+                  Text(
+                    'Smart Digital Ledger Engine',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             )
           ],
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
 
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'KHATABOOK REALTIME NETWORK',
-              style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
+            const Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'KHATABOOK REALTIME NETWORK',
+                  style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
+                ),
+              ),
             ),
+            const SizedBox(width: 8),
             FadeTransition(
               opacity: _pulseAnimation,
               child: Container(
@@ -278,6 +289,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   border: Border.all(color: const Color(0xFF10B981)),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     CircleAvatar(radius: 3, backgroundColor: _isScreenLoading ? Colors.amber : const Color(0xFF10B981)),
                     const SizedBox(width: 6),
@@ -322,7 +334,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             ],
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
 
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 500),
@@ -360,16 +372,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          height: 80,
-          width: 80,
+          height: 72,
+          width: 72,
           decoration: BoxDecoration(
             color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: const Color(0xFF38BDF8), width: 2),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF38BDF8).withOpacity(0.35),
-                blurRadius: 18,
+                blurRadius: 16,
                 spreadRadius: 2,
               )
             ],
@@ -379,7 +391,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             children: [
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(18),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -387,7 +399,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   ),
                 ),
               ),
-              const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF38BDF8), size: 38),
+              const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF38BDF8), size: 34),
             ],
           ),
         ),
@@ -404,22 +416,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          height: 100,
-          width: 80,
+          height: 92,
+          width: 72,
           decoration: BoxDecoration(
             color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: const Color(0xFF38BDF8), width: 2),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF38BDF8).withOpacity(0.3),
-                blurRadius: 16,
+                blurRadius: 14,
                 spreadRadius: 2,
               )
             ],
           ),
           child: CustomPaint(
-            size: const Size(80, 100),
+            size: const Size(72, 92),
             painter: FullBodyCharacterVectorPainter(),
           ),
         ),
@@ -432,13 +444,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
 
   Widget _buildSeamlessMessageRow({required String sender, required String msg, required bool isOwner}) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          isOwner ? Icons.verified_user_rounded : Icons.account_circle_rounded,
-          color: isOwner ? const Color(0xFF38BDF8) : const Color(0xFF10B981),
-          size: 16,
+        Padding(
+          padding: const EdgeInsets.only(top: 2.0),
+          child: Icon(
+            isOwner ? Icons.verified_user_rounded : Icons.account_circle_rounded,
+            color: isOwner ? const Color(0xFF38BDF8) : const Color(0xFF10B981),
+            size: 16,
+          ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
           child: RichText(
             text: TextSpan(
@@ -465,12 +481,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Khatabook',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+        const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'Khatabook',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+          ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
 
         AnimatedBuilder(
           animation: _floatController,
@@ -479,28 +498,28 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               offset: Offset(0, _floatAnimation.value),
               child: Center(
                 child: Container(
-                  height: 110,
-                  width: 110,
+                  height: 100,
+                  width: 100,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
                     ),
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(26),
                     border: Border.all(color: _isScreenLoading ? Colors.amber.withOpacity(0.5) : Colors.white12, width: 1.5),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.6),
-                        blurRadius: 20,
+                        blurRadius: 18,
                         spreadRadius: 2,
-                        offset: const Offset(0, 10),
+                        offset: const Offset(0, 8),
                       )
                     ],
                   ),
                   child: Icon(
                     Icons.menu_book_rounded, 
-                    size: 56, 
+                    size: 50, 
                     color: _isScreenLoading ? Colors.amber : const Color(0xFF38BDF8),
                   ),
                 ),
@@ -508,24 +527,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
             );
           },
         ),
-        const SizedBox(height: 36),
+        const SizedBox(height: 32),
 
         Text(
           _isScreenLoading ? 'Establishing Secure Protocol...' : 'Welcome to Khatabook',
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Text(
           _isScreenLoading 
               ? 'Synchronizing local databases, encryption layers, and tenant parameters. Please stand by.'
               : 'Your intelligent, multi-tenant digital ledger engine. Secure your credits and streamline accounting effortlessly.',
-          style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), height: 1.5),
+          style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8), height: 1.45),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 32),
 
-        // ⚡ Get Started Button Removed - Direct Loading Indicator View
         if (_isScreenLoading) ...[
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -540,27 +558,32 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                'Loading Verification Stack... ${( _loadingProgress * 100).toInt()}%',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'Loading Verification Stack... ${(_loadingProgress * 100).toInt()}%',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                ),
               ),
             ],
           ),
         ] else ...[
-          // Subtle Tap Indicator Text
-          Text(
-            'Tap anywhere on screen to continue',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: const Color(0xFF10B981).withOpacity(0.8),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
+          const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'Tap anywhere on screen to continue',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF10B981),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
 
         Text(
           'By continuing you agree to our Terms & Conditions.',
@@ -619,64 +642,57 @@ class FullBodyCharacterVectorPainter extends CustomPainter {
 
     final hairPaint = Paint()..color = const Color(0xFF1E293B);
     final skinPaint = Paint()..color = const Color(0xFFFDBA74);
-    final shirtPaint = Paint()..color = const Color(0xFF9A3412); // Brown T-Shirt
-    final pantsPaint = Paint()..color = const Color(0xFF38BDF8); // Light Blue Pants
+    final shirtPaint = Paint()..color = const Color(0xFF9A3412);
+    final pantsPaint = Paint()..color = const Color(0xFF38BDF8);
     final shoePaint = Paint()..color = const Color(0xFF78350F);
     final phonePaint = Paint()..color = const Color(0xFF0F172A);
 
-    // 1️⃣ Head & Hair
-    canvas.drawCircle(Offset(cx, 16), 9, hairPaint);
-    canvas.drawCircle(Offset(cx, 18), 7.5, skinPaint);
+    canvas.drawCircle(Offset(cx, 14), 8, hairPaint);
+    canvas.drawCircle(Offset(cx, 16), 6.5, skinPaint);
 
-    // 2️⃣ T-Shirt (Torso)
     final RRect torso = RRect.fromRectAndRadius(
-      Rect.fromLTWH(cx - 10, 26, 20, 26),
-      const Radius.circular(6),
+      Rect.fromLTWH(cx - 9, 23, 18, 24),
+      const Radius.circular(5),
     );
     canvas.drawRRect(torso, shirtPaint);
 
-    // 3️⃣ Left Arm (Pocket)
     final Path leftArm = Path()
-      ..moveTo(cx - 10, 28)
-      ..lineTo(cx - 15, 42)
-      ..lineTo(cx - 8, 48);
+      ..moveTo(cx - 9, 25)
+      ..lineTo(cx - 14, 38)
+      ..lineTo(cx - 7, 44);
 
     final armStrokePaint = Paint()
       ..color = const Color(0xFF9A3412)
-      ..strokeWidth = 4
+      ..strokeWidth = 3.5
       ..style = PaintingStyle.stroke;
 
     canvas.drawPath(leftArm, armStrokePaint);
 
-    // 4️⃣ Right Arm (Holding Smartphone)
     final Path rightArm = Path()
-      ..moveTo(cx + 10, 28)
-      ..lineTo(cx + 18, 38)
-      ..lineTo(cx + 22, 34);
+      ..moveTo(cx + 9, 25)
+      ..lineTo(cx + 16, 34)
+      ..lineTo(cx + 20, 30);
 
     canvas.drawPath(rightArm, armStrokePaint);
 
-    // Smartphone
     canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(cx + 18, 28, 8, 12), const Radius.circular(2)),
+      RRect.fromRectAndRadius(Rect.fromLTWH(cx + 16, 25, 7, 10), const Radius.circular(2)),
       phonePaint,
     );
 
-    // 5️⃣ Pants (Legs)
     final Path legs = Path()
-      ..moveTo(cx - 9, 52)
-      ..lineTo(cx - 10, 86)
-      ..lineTo(cx - 2, 86)
-      ..lineTo(cx, 58)
-      ..lineTo(cx + 2, 86)
-      ..lineTo(cx + 10, 86)
-      ..lineTo(cx + 9, 52)
+      ..moveTo(cx - 8, 47)
+      ..lineTo(cx - 9, 78)
+      ..lineTo(cx - 2, 78)
+      ..lineTo(cx, 52)
+      ..lineTo(cx + 2, 78)
+      ..lineTo(cx + 9, 78)
+      ..lineTo(cx + 8, 47)
       ..close();
     canvas.drawPath(legs, pantsPaint);
 
-    // 6️⃣ Shoes
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(cx - 12, 86, 9, 5), const Radius.circular(2)), shoePaint);
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(cx + 3, 86, 9, 5), const Radius.circular(2)), shoePaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(cx - 11, 78, 8, 5), const Radius.circular(2)), shoePaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(cx + 3, 78, 8, 5), const Radius.circular(2)), shoePaint);
   }
 
   @override
@@ -747,7 +763,7 @@ class DashedZigZagAirplanePathPainter extends CustomPainter {
       text: TextSpan(
         text: String.fromCharCode(Icons.send_rounded.codePoint),
         style: TextStyle(
-          fontSize: 22,
+          fontSize: 20,
           fontFamily: Icons.send_rounded.fontFamily,
           color: isPaused ? Colors.amber : const Color(0xFF38BDF8),
           shadows: [

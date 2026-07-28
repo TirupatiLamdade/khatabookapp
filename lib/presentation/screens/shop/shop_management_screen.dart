@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:login_setup/core/services/notification_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/providers/global_provider_hub.dart';
 
@@ -97,7 +98,7 @@ class _SingleActiveShopPanel extends StatelessWidget {
   }) : super(key: key);
 
   // 🗺️ Google Maps Directions Launcher
-  Future<void> _launchGoogleMaps(BuildContext context, String address) async {
+  Future<void> _launchGoogleMaps(BuildContext context, String address, String customerName) async {
     if (address.trim().isEmpty || address == 'No Address Listed') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No valid address available for navigation!')),
@@ -110,6 +111,13 @@ class _SingleActiveShopPanel extends StatelessWidget {
 
     try {
       if (await canLaunchUrl(googleMapsUrl)) {
+        // 🔔 TRIGGER NOTIFICATION
+        await NotificationService.sendNotification(
+          title: 'Map Route Launched',
+          body: 'Opened directions to $customerName\'s address in Google Maps.',
+          type: 'update',
+        );
+
         await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
       } else {
         if (context.mounted) {
@@ -555,7 +563,6 @@ class _SingleActiveShopPanel extends StatelessWidget {
                                 ),
                                 child: Row(
                                   children: [
-                                    // 🟢 Contact Circle Avatar with Customer Name Initial
                                     CircleAvatar(
                                       radius: 20,
                                       backgroundColor: const Color(0xFF38BDF8).withOpacity(0.15),
@@ -570,7 +577,6 @@ class _SingleActiveShopPanel extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 12),
 
-                                    // 🟢 Live Name, Phone & Address
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -621,9 +627,8 @@ class _SingleActiveShopPanel extends StatelessWidget {
 
                                     const SizedBox(width: 8),
 
-                                    // 🗺️ Interactive Live Route Map Circle Button
                                     InkWell(
-                                      onTap: () => _launchGoogleMaps(context, cAddress),
+                                      onTap: () => _launchGoogleMaps(context, cAddress, cName),
                                       borderRadius: BorderRadius.circular(20),
                                       child: Container(
                                         padding: const EdgeInsets.all(8),

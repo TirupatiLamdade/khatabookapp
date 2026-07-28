@@ -241,11 +241,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final Color editableBgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final Color borderColor = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
 
-    final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 1024;
-    final isTablet = size.width > 640 && size.width <= 1024;
-    final layoutWidth = isDesktop ? 780.0 : (isTablet ? size.width * 0.90 : size.width);
-
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
@@ -263,208 +258,219 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
-          : SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              // 🟢 Padding includes 140px bottom padding for floating navigation bars/widgets
-              padding: EdgeInsets.only(
-                left: isDesktop ? 32 : (isTablet ? 24 : 16),
-                right: isDesktop ? 32 : (isTablet ? 24 : 16),
-                top: 24,
-                bottom: 140,
-              ),
-              child: Center(
-                child: Container(
-                  width: layoutWidth,
-                  padding: EdgeInsets.all(isDesktop ? 32 : 20),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: borderColor, width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final double screenWidth = constraints.maxWidth;
+                final bool isDesktop = screenWidth > 1024;
+                final bool isTablet = screenWidth > 640 && screenWidth <= 1024;
+                final double layoutWidth = isDesktop ? 780.0 : (isTablet ? screenWidth * 0.90 : screenWidth);
+
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  // 🟢 Padding includes 140px bottom padding for floating navigation bars/widgets
+                  padding: EdgeInsets.only(
+                    left: isDesktop ? 32 : (isTablet ? 24 : 16),
+                    right: isDesktop ? 32 : (isTablet ? 24 : 16),
+                    top: 24,
+                    bottom: 140,
                   ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 👤 PROFILE HEADER
-                        Center(
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF38BDF8).withOpacity(0.15),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
-                                ),
-                                child: const Icon(Icons.storefront_rounded, size: 44, color: Color(0xFF38BDF8)),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _ownerNameController.text.isNotEmpty ? _ownerNameController.text : 'Owner Legal Name',
-                                style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.w900),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _phoneController.text.isNotEmpty ? '+91 ${_phoneController.text}' : 'No Mobile Channel Linked',
-                                style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 14, fontWeight: FontWeight.bold),
-                              ),
-                            ],
+                  child: Center(
+                    child: Container(
+                      width: layoutWidth,
+                      padding: EdgeInsets.all(isDesktop ? 32 : (isTablet ? 24 : 16)),
+                      decoration: BoxDecoration(
+                        color: cardBgColor,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: borderColor, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // 🔒 STRICTLY LOCKED FIELDS
-                        const Text(
-                          'PROTECTED OPERATOR CREDENTIALS (LOCKED)',
-                          style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1),
-                        ),
-                        const SizedBox(height: 14),
-
-                        _buildLockedField(
-                          label: 'USERNAME',
-                          controller: _usernameController,
-                          icon: Icons.person_pin_rounded,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          lockedBgColor: lockedBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 14),
-                        _buildLockedField(
-                          label: 'MOBILE NUMBER',
-                          controller: _phoneController,
-                          icon: Icons.phone_android_rounded,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          lockedBgColor: lockedBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 14),
-                        _buildLockedField(
-                          label: 'EMAIL ADDRESS',
-                          controller: _emailController,
-                          icon: Icons.mail_outline_rounded,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          lockedBgColor: lockedBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 28),
-
-                        // ✏️ EDITABLE FIELDS
-                        const Text(
-                          'EDITABLE SHOP INFORMATION',
-                          style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // 1. Shop Name
-                        _buildInlineEditableField(
-                          keyKey: 'shopName',
-                          controller: _shopNameController,
-                          label: 'Shop / Business Name *',
-                          icon: Icons.storefront_rounded,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          editableBgColor: editableBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 2. Owner Legal Name
-                        _buildInlineEditableField(
-                          keyKey: 'ownerName',
-                          controller: _ownerNameController,
-                          label: 'Owner Legal Name *',
-                          icon: Icons.person_outline_rounded,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          editableBgColor: editableBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 3. Business Category
-                        _buildInlineEditableField(
-                          keyKey: 'category',
-                          controller: _categoryController,
-                          label: 'Business Category *',
-                          icon: Icons.category_outlined,
-                          isCategoryDropdown: true,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          editableBgColor: editableBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 4. GSTIN Number
-                        _buildInlineEditableField(
-                          keyKey: 'gstin',
-                          controller: _gstinController,
-                          label: 'Corporate GSTIN Number',
-                          icon: Icons.receipt_long_rounded,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          editableBgColor: editableBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 5. UPI ID
-                        _buildInlineEditableField(
-                          keyKey: 'upi',
-                          controller: _upiController,
-                          label: 'Business UPI Payment ID',
-                          icon: Icons.qr_code_rounded,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          editableBgColor: editableBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 6. Shop Address
-                        _buildInlineEditableField(
-                          keyKey: 'address',
-                          controller: _addressController,
-                          label: 'Physical Shop Address *',
-                          icon: Icons.location_on_outlined,
-                          maxLines: 2,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          editableBgColor: editableBgColor,
-                          borderColor: borderColor,
-                        ),
-                        const SizedBox(height: 32),
-
-                        SizedBox(
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            onPressed: _isSaving ? null : _updateShopProfile,
-                            icon: _isSaving
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Icon(Icons.save_rounded, color: Colors.white),
-                            label: Text(_isSaving ? 'Saving Changes...' : 'Save Profile Changes', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6366F1),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ],
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 👤 PROFILE HEADER
+                            Center(
+                              child: Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF38BDF8).withOpacity(0.15),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+                                    ),
+                                    child: const Icon(Icons.storefront_rounded, size: 44, color: Color(0xFF38BDF8)),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    _ownerNameController.text.isNotEmpty ? _ownerNameController.text : 'Owner Legal Name',
+                                    style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.w900),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _phoneController.text.isNotEmpty ? '+91 ${_phoneController.text}' : 'No Mobile Channel Linked',
+                                    style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 14, fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        )
-                      ],
+                            const SizedBox(height: 32),
+
+                            // 🔒 STRICTLY LOCKED FIELDS
+                            const Text(
+                              'PROTECTED OPERATOR CREDENTIALS (LOCKED)',
+                              style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1),
+                            ),
+                            const SizedBox(height: 14),
+
+                            _buildLockedField(
+                              label: 'USERNAME',
+                              controller: _usernameController,
+                              icon: Icons.person_pin_rounded,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              lockedBgColor: lockedBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 14),
+                            _buildLockedField(
+                              label: 'MOBILE NUMBER',
+                              controller: _phoneController,
+                              icon: Icons.phone_android_rounded,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              lockedBgColor: lockedBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 14),
+                            _buildLockedField(
+                              label: 'EMAIL ADDRESS',
+                              controller: _emailController,
+                              icon: Icons.mail_outline_rounded,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              lockedBgColor: lockedBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 28),
+
+                            // ✏️ EDITABLE FIELDS
+                            const Text(
+                              'EDITABLE SHOP INFORMATION',
+                              style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // 1. Shop Name
+                            _buildInlineEditableField(
+                              keyKey: 'shopName',
+                              controller: _shopNameController,
+                              label: 'Shop / Business Name *',
+                              icon: Icons.storefront_rounded,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              editableBgColor: editableBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 2. Owner Legal Name
+                            _buildInlineEditableField(
+                              keyKey: 'ownerName',
+                              controller: _ownerNameController,
+                              label: 'Owner Legal Name *',
+                              icon: Icons.person_outline_rounded,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              editableBgColor: editableBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 3. Business Category
+                            _buildInlineEditableField(
+                              keyKey: 'category',
+                              controller: _categoryController,
+                              label: 'Business Category *',
+                              icon: Icons.category_outlined,
+                              isCategoryDropdown: true,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              editableBgColor: editableBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 4. GSTIN Number
+                            _buildInlineEditableField(
+                              keyKey: 'gstin',
+                              controller: _gstinController,
+                              label: 'Corporate GSTIN Number',
+                              icon: Icons.receipt_long_rounded,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              editableBgColor: editableBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 5. UPI ID
+                            _buildInlineEditableField(
+                              keyKey: 'upi',
+                              controller: _upiController,
+                              label: 'Business UPI Payment ID',
+                              icon: Icons.qr_code_rounded,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              editableBgColor: editableBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 6. Shop Address
+                            _buildInlineEditableField(
+                              keyKey: 'address',
+                              controller: _addressController,
+                              label: 'Physical Shop Address *',
+                              icon: Icons.location_on_outlined,
+                              maxLines: 2,
+                              textColor: textColor,
+                              subTextColor: subTextColor,
+                              editableBgColor: editableBgColor,
+                              borderColor: borderColor,
+                            ),
+                            const SizedBox(height: 32),
+
+                            SizedBox(
+                              height: 52,
+                              child: ElevatedButton.icon(
+                                onPressed: _isSaving ? null : _updateShopProfile,
+                                icon: _isSaving
+                                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : const Icon(Icons.save_rounded, color: Colors.white),
+                                label: Text(_isSaving ? 'Saving Changes...' : 'Save Profile Changes', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366F1),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
     );
   }

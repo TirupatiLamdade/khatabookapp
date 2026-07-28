@@ -1,12 +1,13 @@
 
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:login_setup/core/services/notification_service.dart';
 import 'package:login_setup/helpers/pdf_export_helper.dart';
 
 import '../../widgets/customer_dialogs.dart';
+
 
 class CustomerLedgerScreen extends StatefulWidget {
   final String customerId;
@@ -83,11 +84,26 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
         await FirebaseFirestore.instance.collection('transactions').doc(_editingTransactionId).update(txData);
         _editingTransactionId = null;
 
+        // 🔔 TRIGGER NOTIFICATION
+        await NotificationService.sendNotification(
+          title: 'Transaction Updated',
+          body: 'Entry "$productName" (₹${calculatedTotalPrice.toStringAsFixed(2)}) updated for ${widget.customerName}.',
+          type: 'edit',
+        );
+
         if (mounted) {
           CustomerDialogs.showTopNotification(context, 'Transaction entry updated successfully!');
         }
       } else {
         await FirebaseFirestore.instance.collection('transactions').add(txData);
+
+        // 🔔 TRIGGER NOTIFICATION
+        await NotificationService.sendNotification(
+          title: 'New Transaction Logged',
+          body: 'Added "$productName" (₹${calculatedTotalPrice.toStringAsFixed(2)}) for ${widget.customerName}.',
+          type: 'transaction',
+        );
+
         if (mounted) {
           CustomerDialogs.showTopNotification(context, 'Added "$productName" (₹${calculatedTotalPrice.toStringAsFixed(2)})');
         }
@@ -221,6 +237,13 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
 
       await batch.commit();
 
+      // 🔔 TRIGGER NOTIFICATION
+      await NotificationService.sendNotification(
+        title: 'Session Pushed',
+        body: 'Pushed session batch (${txSnap.docs.length} items) for ${widget.customerName} to Historybook.',
+        type: 'transaction',
+      );
+
       if (mounted) {
         CustomerDialogs.showTopNotification(context, 'Pushed session batch (${txSnap.docs.length} items) to Historybook!');
       }
@@ -255,6 +278,13 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
 
         await _deleteTransactionImpact(txId);
         await FirebaseFirestore.instance.collection('transactions').doc(txId).delete();
+
+        // 🔔 TRIGGER NOTIFICATION
+        await NotificationService.sendNotification(
+          title: 'Transaction Item Deleted',
+          body: 'Item "$productName" was deleted from ${widget.customerName}\'s ledger.',
+          type: 'delete',
+        );
 
         _setButtonLoading('tx_del_$txId', false);
         if (mounted) {
@@ -581,9 +611,12 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              widget.customerName,
-              style: TextStyle(fontWeight: FontWeight.w900, color: textColor, fontSize: 18),
+            Expanded(
+              child: Text(
+                widget.customerName,
+                style: TextStyle(fontWeight: FontWeight.w900, color: textColor, fontSize: 18),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -731,9 +764,6 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     );
   }
 
-  // -------------------------------------------------------------
-  // 🔴 CUSTOMER HEADER CARD WITH CORRECTED PDF BUTTON CALL
-  // -------------------------------------------------------------
   Widget _buildCustomerHeaderCard(bool isDark, Color textColor, Color cardBgColor, Color borderColor) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -749,9 +779,12 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
             children: [
               const Icon(Icons.phone_iphone_rounded, color: Color(0xFF38BDF8), size: 16),
               const SizedBox(width: 8),
-              Text(
-                'Primary Comm Line: +91 ${widget.customerPhone}',
-                style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold, fontSize: 13),
+              Expanded(
+                child: Text(
+                  'Primary Comm Line: +91 ${widget.customerPhone}',
+                  style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -764,6 +797,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 child: Text(
                   'Warehouse Node: ${widget.customerAddress}',
                   style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -783,7 +817,6 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 🟢 1. ACTIVE BALANCE MATRIX CONTAINER
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
@@ -811,7 +844,6 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                     ),
                     const SizedBox(width: 10),
 
-                    // 🔴 2. PDF EXPORT BUTTON (CORRECTED WITH CUSTOMER ID)
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -822,7 +854,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                       ),
                       tooltip: 'Export PDF Report',
                       onPressed: () {
-                    PdfExportHelper.showExportDialog(
+                        PdfExportHelper.showExportDialog(
                           context,
                           customerId: widget.customerId,
                           customerName: widget.customerName,

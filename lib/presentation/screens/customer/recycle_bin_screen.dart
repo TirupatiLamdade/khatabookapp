@@ -1,10 +1,11 @@
 
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:login_setup/core/services/notification_service.dart';
 import '../../widgets/customer_dialogs.dart';
+
 
 class RecycleBinScreen extends StatefulWidget {
   const RecycleBinScreen({Key? key}) : super(key: key);
@@ -26,7 +27,6 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
   bool _isLoading(String id) => _loadingState[id] ?? false;
 
-  // ⚡ FAST TOP NOTIFICATION
   void _showFastTopNotification(String message, {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -91,6 +91,13 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
       await batch.commit();
 
+      // 🔔 TRIGGER NOTIFICATION
+      await NotificationService.sendNotification(
+        title: 'Customer Restored',
+        body: 'Customer ${historyData['name'] ?? 'Account'} was restored from Recycle Bin.',
+        type: 'add',
+      );
+
       _showFastTopNotification('Restored ${historyData['name'] ?? 'Customer'} successfully!');
     } catch (e) {
       _showFastTopNotification('Failed to restore customer record!', isError: true);
@@ -104,6 +111,14 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
     _setLoading('perm_$customerId', true);
     try {
       await FirebaseFirestore.instance.collection('deleted_customers_history').doc(customerId).delete();
+
+      // 🔔 TRIGGER NOTIFICATION
+      await NotificationService.sendNotification(
+        title: 'Customer Permanently Deleted',
+        body: 'Customer account $name was permanently purged from Recycle Bin.',
+        type: 'delete',
+      );
+
       _showFastTopNotification('Permanently purged $name from recycle bin!');
     } catch (e) {
       _showFastTopNotification('Failed to permanently delete record!', isError: true);
@@ -128,7 +143,6 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
       );
     }
 
-    // 🎨 Dynamic Theme Mode Detection
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF0B0F17) : const Color(0xFFF8FAFC);
     final cardBgColor = isDark ? const Color(0xFF121824) : Colors.white;
@@ -145,9 +159,12 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
           children: [
             const Icon(Icons.delete_sweep_rounded, color: Color(0xFFEF4444), size: 22),
             const SizedBox(width: 10),
-            Text(
-              'Recycle Bin & History',
-              style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 17),
+            Expanded(
+              child: Text(
+                'Recycle Bin & History',
+                style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 17),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -205,7 +222,6 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
                     return ListView.builder(
                       physics: const BouncingScrollPhysics(),
-                      // 🟢 Bottom padding set to 120px to prevent action buttons from being blocked
                       padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 120),
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
@@ -361,10 +377,8 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
 
                                 const SizedBox(height: 12),
 
-                                // Action Buttons
                                 Row(
                                   children: [
-                                    // RESTORE BUTTON
                                     Expanded(
                                       child: SizedBox(
                                         height: 42,
@@ -388,7 +402,6 @@ class _RecycleBinScreenState extends State<RecycleBinScreen> {
                                     ),
                                     const SizedBox(width: 10),
 
-                                    // DELETE FOREVER BUTTON
                                     Expanded(
                                       child: SizedBox(
                                         height: 42,
