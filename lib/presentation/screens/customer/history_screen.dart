@@ -1,8 +1,12 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:login_setup/core/services/notification_service.dart';
 import '../../widgets/customer_dialogs.dart';
+
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({Key? key}) : super(key: key);
@@ -58,6 +62,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // 4. Remove entry from deleted products history collection
       await FirebaseFirestore.instance.collection('deleted_products_history').doc(historyDocId).delete();
 
+      // 🔔 TRIGGER NOTIFICATION
+      await NotificationService.sendNotification(
+        title: 'Product Restored',
+        body: 'Product "$productName" was restored to ${productData['customerName'] ?? 'Customer'}\'s ledger.',
+        type: 'add',
+      );
+
       _setButtonLoading('restore_$historyDocId', false);
       if (mounted) {
         CustomerDialogs.showTopNotification(
@@ -88,6 +99,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _setButtonLoading('perm_$historyDocId', true);
       try {
         await FirebaseFirestore.instance.collection('deleted_products_history').doc(historyDocId).delete();
+
+        // 🔔 TRIGGER NOTIFICATION
+        await NotificationService.sendNotification(
+          title: 'Product Purged',
+          body: 'Product "$productName" was permanently deleted from history.',
+          type: 'delete',
+        );
+
         _setButtonLoading('perm_$historyDocId', false);
         if (mounted) {
           CustomerDialogs.showTopNotification(
@@ -211,6 +230,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
         }
         await batch.commit();
 
+        // 🔔 TRIGGER NOTIFICATION
+        await NotificationService.sendNotification(
+          title: 'History Cleared',
+          body: 'All deleted product records were permanently purged.',
+          type: 'delete',
+        );
+
         if (mounted) {
           CustomerDialogs.showTopNotification(context, 'Cleared all deleted product records!');
         }
@@ -325,7 +351,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     return ListView.builder(
                       physics: const BouncingScrollPhysics(),
                       cacheExtent: 500,
-                      // 🟢 bottom: 120 ensures bottom floating bar won't overlap action buttons
                       padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 120),
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
@@ -339,7 +364,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         final double qty = double.tryParse(data['quantity']?.toString() ?? '0.0') ?? 0.0;
                         final String type = data['type'] ?? 'credit';
 
-                        // Date Formatting
                         String deletedTimeFormatted = 'Time N/A';
                         if (data['deletedAt'] != null && data['deletedAt'] is Timestamp) {
                           DateTime dt = (data['deletedAt'] as Timestamp).toDate();
@@ -374,7 +398,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // 1️⃣ PRODUCT NAME AND PRICE
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
@@ -407,7 +430,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                                 const SizedBox(height: 10),
 
-                                // 2️⃣ DELETED DATE & TIME STAMP
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
@@ -429,10 +451,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                                 const SizedBox(height: 14),
 
-                                // 3️⃣ RESTORE & DELETE BUTTONS
                                 Row(
                                   children: [
-                                    // 🔄 RESTORE BUTTON
                                     Expanded(
                                       child: SizedBox(
                                         height: 40,
@@ -460,7 +480,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ),
                                     const SizedBox(width: 12),
 
-                                    // 🗑️ DELETE BUTTON
                                     Expanded(
                                       child: SizedBox(
                                         height: 40,

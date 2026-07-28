@@ -1,5 +1,4 @@
 
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -12,26 +11,42 @@ import '../screens/auth/processing_screen.dart';
 import '../screens/shop/shop_setup_screen.dart';
 import '../screens/dashboard/home_screen.dart';
 
-
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
     
+    // Auth State बदलल्यावर रिफ्रेश करण्यासाठी
     refreshListenable: GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
     
     redirect: (BuildContext context, GoRouterState state) {
       final user = FirebaseAuth.instance.currentUser;
       final location = state.matchedLocation;
 
-      final isPublicOrGatekeeper = location == '/splash' || 
-                                   location == '/welcome' || 
-                                   location == '/login' || 
-                                   location == '/processing' ||
-                                   location == '/shop-setup';
+      final isPublicRoute = location == '/splash' || 
+                            location == '/welcome' || 
+                            location == '/login';
 
-      // 1️⃣ जर युझर लॉग इन नसेल आणि Home सारख्या प्रिव्हेट स्क्रीनवर जात असेल
-      if (user == null && !isPublicOrGatekeeper) {
+      final isGatekeeperRoute = location == '/processing' || 
+                                location == '/shop-setup';
+
+      // 1️⃣ जर युझर लॉग इन नसेल आणि प्रिव्हेट/गेटकीपर स्क्रीनवर जाण्याचा प्रयत्न करत असेल
+      if (user == null && !isPublicRoute) {
         return '/welcome';
+      }
+
+      // 2️⃣ जर युझर आधीपासूनच लॉग इन (आणि ईमेल व्हेरीफाय) असेल
+      if (user != null) {
+        final isEmailVerified = user.emailVerified;
+
+        // जर युझर पब्लिक रूटवर (उदा. welcome किंवा login) असेल, तर त्याला थेट home वर पाठवा
+        if (isPublicRoute && location != '/splash') {
+          if (isEmailVerified) {
+            return '/home';
+          } else {
+            // जर ईमेल व्हेरीफाय नसेल तर लॉगिनला पाठवा
+            return '/login';
+          }
+        }
       }
 
       return null;
@@ -90,7 +105,8 @@ class GoRouterRefreshStream extends ChangeNotifier {
 
   @override
   void dispose() {
-    _subscription.cancel(); super.dispose();
+    _subscription.cancel();
+    super.dispose();
   }
 }
 
